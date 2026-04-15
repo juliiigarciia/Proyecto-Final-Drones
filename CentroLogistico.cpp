@@ -272,6 +272,34 @@ void registrarPaquete(CentroLogistico& c, Paquete p) {
             c.numCola++;
         }
     }
+    procesarCola(c);
+}
+
+void procesarCola(CentroLogistico& c) {
+    if (c.numCola == 0) return;
+
+    cout << "\n[COLA] Procesando paquetes en espera...\n";
+
+    int i = 0;
+    while (i < c.numCola) {
+        Paquete p = c.cola[i];
+
+        int idxDron = buscarDronCualquiera(c, p.peso);
+
+        if (idxDron != -1) {
+            cout << "[COLA] Intentando enviar paquete " << p.id << "\n";
+
+            realizarEnvio(c, idxDron, p);
+
+            // eliminar de la cola (shift)
+            for (int j = i; j < c.numCola - 1; j++) {
+                c.cola[j] = c.cola[j + 1];
+            }
+            c.numCola--;
+        } else {
+            i++; // pasar al siguiente
+        }
+    }
 }
 
 // Muestra todos los paquetes pendientes de asignacion
