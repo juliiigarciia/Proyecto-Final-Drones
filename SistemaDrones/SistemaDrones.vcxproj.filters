@@ -18,9 +18,15 @@
     <ClInclude Include="Drone.hpp">
       <Filter>Archivos de encabezado</Filter>
     </ClInclude>
+    <ClInclude Include="Paquete.hpp">
+      <Filter>Archivos de encabezado</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Drone.cpp">
+      <Filter>Archivos de origen</Filter>
+    </ClCompile>
+    <ClCompile Include="Paquete.cpp">
       <Filter>Archivos de origen</Filter>
     </ClCompile>
   </ItemGroup>
