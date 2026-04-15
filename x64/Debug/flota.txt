@@ -1,0 +1,13 @@
+# flota.txt
+# Archivo de configuracion inicial de la flota de drones.
+# Formato de cada linea: TIPO;ID;NOMBRE;BATERIA_ACTUAL
+# - TIPO: Standard | Express | HeavyDuty
+# - BATERIA_ACTUAL: km restantes de bateria (max segun tipo)
+# Las lineas que empiezan por '#' son comentarios y se ignoran.
+
+Standard;D001;Aguila-1;75.0
+Express;D002;Falcon-3;55.0
+HeavyDuty;D003;Titan-1;110.0
+Express;D004;Falcon-7;60.0
+Standard;D005;Aguila-5;80.0
+HeavyDuty;D006;Titan-2;100.0
