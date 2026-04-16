@@ -1,40 +1,277 @@
-#include <iostream>
-#include <string>
+// =============================================================
+// main.cpp
+// Programa principal del SIGFD.
+//
+// Compilar:
+//   g++ -std=c++17 -Wall main.cpp Drone.cpp Paquete.cpp
+//       GestorRutas.cpp GestorFicheros.cpp CentroLogistico.cpp -o sigfd
+//
+// Ejecutar:
+//   sigfd.exe (Windows)   /   ./sigfd (Linux/Mac)
+// =============================================================
+
+#include "CentroLogistico.hpp"
 #include "Drone.hpp"
 #include "Paquete.hpp"
-//#include "GestorRutas.hpp"
+#include "GestorRutas.hpp"
+
+#include <iostream>
+#include <string>
 
 using namespace std;
 
-// --- Funciones de Test (Fase 8) ---
+
+// =============================================================
+// TESTS BASICOS
+// =============================================================
+
+// TEST 1: Verificar que Dijkstra encuentra la ruta correcta
 void testDijkstra() {
-    cout << "[TEST] testDijkstra(): Simulando calculo de ruta... OK\n";
+    cout << "\n================================================\n";
+    cout << "TEST 1: Algoritmo de Dijkstra\n";
+    cout << "================================================\n";
+
+    Grafo g;
+    inicializarGrafo(g);
+    mostrarGrafo(g);
+
+    // Caso 1: hay dos caminos a Zona Norte (5km directo o 3+4=7km)
+    // Dijkstra debe elegir los 5 km directos
+    cout << "\n[TEST] Almacen Central --> Zona Norte\n";
+    ResultadoRuta r1 = calcularRutaOptima(g, "Zona Norte");
+    if (r1.encontrada && r1.kmTotales == 5.0) {
+        cout << "  --> CORRECTO: ruta optima = " << r1.kmTotales << " km\n";
+    }
+    else {
+        cout << "  --> ERROR: se esperaban 5 km, se obtuvo: " << r1.kmTotales << " km\n";
+    }
+
+    // Caso 2: solo hay un camino a Zona Sur (8 km)
+    cout << "\n[TEST] Almacen Central --> Zona Sur\n";
+    ResultadoRuta r2 = calcularRutaOptima(g, "Zona Sur");
+    if (r2.encontrada && r2.kmTotales == 8.0) {
+        cout << "  --> CORRECTO: ruta optima = " << r2.kmTotales << " km\n";
+    }
+    else {
+        cout << "  --> ERROR: se esperaban 8 km, se obtuvo: " << r2.kmTotales << " km\n";
+    }
+
+    // Caso 3: destino que no existe en el grafo
+    cout << "\n[TEST] Almacen Central --> Destino Inexistente\n";
+    ResultadoRuta r3 = calcularRutaOptima(g, "Lugar Inexistente");
+    if (!r3.encontrada) {
+        cout << "  --> CORRECTO: se detecto destino invalido\n";
+    }
+    else {
+        cout << "  --> ERROR: deberia haber fallado\n";
+    }
 }
 
+// TEST 2: Verificar que se detecta cuando un paquete supera la carga maxima
 void testCargaExcesiva() {
-    cout << "[TEST] testCargaExcesiva(): Verificando limites... OK\n";
+    cout << "\n================================================\n";
+    cout << "TEST 2: Comprobacion de peso excesivo\n";
+    cout << "================================================\n";
+
+    // Un DroneExpress solo puede cargar 8 kg
+    Drone dron;
+    configurarDron(dron, EXPRESS, "TEST-01", "DronPrueba");
+
+    // Intentamos asignar un paquete de 50 kg
+    Paquete paquete;
+    paquete.id = "PKG-TEST";
+    paquete.peso = 50.0;
+    paquete.destino = "Zona Norte";
+    paquete.prioridad = NORMAL;
+    paquete.idDronAsignado = "";
+
+    cout << "[TEST] Intentando enviar " << paquete.peso
+        << " kg con un dron de capacidad maxima "
+        << dron.cargaMaxima << " kg...\n";
+
+    if (paquete.peso > dron.cargaMaxima) {
+        cout << "  --> CORRECTO: El paquete supera la carga maxima del dron.\n";
+    }
+    else {
+        cout << "  --> ERROR: deberia haber detectado el exceso de peso.\n";
+    }
 }
 
+// TEST 3: Crear y rellenar un array de 100 paquetes (sin memoria dinamica)
 void testArrayPaquetes() {
-    cout << "[TEST] testArrayPaquetes(): Verificando memoria... OK\n";
+    cout << "\n================================================\n";
+    cout << "TEST 3: Array de 100 paquetes (sin new/delete)\n";
+    cout << "================================================\n";
+
+    const int CANTIDAD = 100;
+    Paquete paquetes[CANTIDAD];
+
+    // Rellenamos el array con datos de prueba
+    for (int i = 0; i < CANTIDAD; i++) {
+        paquetes[i].id = "PKG-MEM-" + to_string(i);
+        paquetes[i].peso = 1.0 + i * 0.1;
+        paquetes[i].destino = "Zona Este";
+        paquetes[i].prioridad = NORMAL;
+        paquetes[i].idDronAsignado = "";
+    }
+
+    cout << "  Paquetes creados en el array: " << CANTIDAD << "\n";
+    cout << "  Sin memoria dinamica (no se usa new ni delete).\n";
+    cout << "  --> CORRECTO\n";
 }
 
-// --- Menu Principal (Fase 7) ---
-int main() {
-    int opcion = 0;
-    do {
-        cout << "\n=== SISTEMA DE DRONES ===\n";
-        cout << "1. Registrar paquete\n";
-        cout << "2. Ejecutar Tests\n";
-        cout << "0. Salir\n";
-        cout << "Opcion: ";
-        cin >> opcion;
 
-        if (opcion == 2) {
-            testDijkstra();
-            testCargaExcesiva();
-            testArrayPaquetes();
+// =============================================================
+// MENU INTERACTIVO
+// =============================================================
+
+int mostrarMenu() {
+    int opcion;
+
+    cout << "\n";
+    cout << "+==========================================+\n";
+    cout << "|   SIGFD - Sistema de Control de Drones   |\n";
+    cout << "+==========================================+\n";
+    cout << "|  1. Ver flota de drones                  |\n";
+    cout << "|  2. Agregar dron manualmente             |\n";
+    cout << "|  3. Registrar nuevo paquete              |\n";
+    cout << "|  4. Ver cola de espera                   |\n";
+    cout << "|  5. Calcular ruta optima (Dijkstra)      |\n";
+    cout << "|  6. Calcular ruta por coordenadas        |\n";
+    cout << "|  7. Ver resumen del dia                  |\n";
+    cout << "|  8. Exportar informe del dia             |\n";
+    cout << "|  9. Ejecutar tests basicos               |\n";
+    cout << "|  0. Salir y exportar informe             |\n";
+    cout << "+==========================================+\n";
+    cout << "  Elige una opcion: ";
+    cin >> opcion;
+
+    return opcion;
+}
+
+
+// =============================================================
+// MAIN
+// =============================================================
+int main() {
+    cout << "==============================================\n";
+    cout << "  Iniciando SIGFD v1.0\n";
+    cout << "  Sistema de Control Logistico para Drones\n";
+    cout << "==============================================\n";
+
+    // Creamos e inicializamos el centro logistico
+    CentroLogistico centro;
+    inicializarCentro(centro, "SIGFD - Madrid Central");
+
+    // Intentamos cargar la flota desde el fichero
+    cargarFlotaDesdeFichero(centro, "flota.txt");
+    bool cargado = (centro.numDrones > 0);
+
+
+    if (!cargado) {
+        cout << "[INFO] Fichero no encontrado. Cargando flota por defecto...\n\n";
+
+        // Flota por defecto
+        Drone d1, d2, d3, d4, d5;
+        configurarDron(d1, STANDARD, "D001", "Aguila-1");
+        configurarDron(d2, EXPRESS, "D002", "Falcon-3");
+        configurarDron(d3, HEAVY_DUTY, "D003", "Titan-1");
+        configurarDron(d4, EXPRESS, "D004", "Falcon-4");
+        configurarDron(d5, STANDARD, "D005", "Aguila-2");
+
+        agregarDron(centro, d1);
+        agregarDron(centro, d2);
+        agregarDron(centro, d3);
+        agregarDron(centro, d4);
+        agregarDron(centro, d5);
+    }
+
+    // Bucle del menu principal
+    int opcion = -1;
+
+    do {
+        opcion = mostrarMenu();
+        cin.ignore(1000, '\n');
+
+        if (opcion == 1) {
+            mostrarFlota(centro);
+        }
+        else if (opcion == 2) {
+            string tipoStr, id, nombre;
+            cout << "  Tipo de dron (Standard / Express / HeavyDuty): ";
+            getline(cin, tipoStr);
+            cout << "  ID del dron (ej. D010): ";
+            getline(cin, id);
+            cout << "  Nombre del dron: ";
+            getline(cin, nombre);
+
+            Drone nuevo;
+            if (tipoStr == "Standard") {
+                configurarDron(nuevo, STANDARD, id, nombre);
+                agregarDron(centro, nuevo);
+            }
+            else if (tipoStr == "Express") {
+                configurarDron(nuevo, EXPRESS, id, nombre);
+                agregarDron(centro, nuevo);
+            }
+            else if (tipoStr == "HeavyDuty") {
+                configurarDron(nuevo, HEAVY_DUTY, id, nombre);
+                agregarDron(centro, nuevo);
+            }
+            else {
+                cout << "[ERROR] Tipo no reconocido.\n";
+            }
+
+        }
+        else if (opcion == 3) {
+            string id, destino, prioridadStr;
+            double peso;
+            cout << "  ID del paquete: ";
+            getline(cin, id);
+            cout << "  Peso (kg): ";
+            cin >> peso;
+            cin.ignore(1000, '\n');
+            cout << "  Destino: ";
+            getline(cin, destino);
+            cout << "  Prioridad (normal / urgente): ";
+            getline(cin, prioridadStr);
+
+            Paquete pkg;
+            pkg.id = id; pkg.peso = peso; pkg.destino = destino;
+            pkg.prioridad = (prioridadStr == "urgente") ? URGENTE : NORMAL;
+            registrarPaquete(centro, pkg);
+
+        }
+        else if (opcion == 4) {
+            mostrarColaEspera(centro);
+        }
+        else if (opcion == 5) {
+            string idDron, destino;
+            cout << "  ID dron: "; getline(cin, idDron);
+            cout << "  Destino: "; getline(cin, destino);
+            asignarRuta(centro, idDron, destino);
+        }
+        else if (opcion == 6) {
+            string idDron; float x, y;
+            cout << "  ID dron: "; getline(cin, idDron);
+            cout << "  X: "; cin >> x; cout << "  Y: "; cin >> y;
+            cin.ignore(1000, '\n');
+            asignarRutaCoordenadas(centro, idDron, x, y);
+        }
+        else if (opcion == 7) {
+            mostrarResumen(centro);
+        }
+        else if (opcion == 8) {
+            exportarInformeDia(centro, "informe_envios.txt");
+        }
+        else if (opcion == 9) {
+            testDijkstra(); testCargaExcesiva(); testArrayPaquetes();
+        }
+        else if (opcion == 0) {
+            exportarInformeDia(centro, "informe_envios.txt");
+            cout << "[INFO] Hasta pronto!\n";
         }
     } while (opcion != 0);
+
     return 0;
 }
