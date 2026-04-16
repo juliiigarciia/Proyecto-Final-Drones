@@ -225,6 +225,38 @@ void mostrarFlota(const CentroLogistico& c) {
 //   > 15 kg  --> HeavyDuty
 // Si el tipo ideal no esta disponible, busca cualquier alternativa.
 // Si no hay ningun dron libre, manda el paquete a la cola de espera.
+
+
+void procesarCola(CentroLogistico& c) {
+    if (c.numCola == 0) return;
+
+    cout << "\n[COLA] Procesando paquetes en espera...\n";
+
+    int i = 0;
+    while (i < c.numCola) {
+        Paquete p = c.cola[i];
+
+        int idxDron = buscarDronCualquiera(c, p.peso);
+
+        if (idxDron != -1) {
+            cout << "[COLA] Intentando enviar paquete " << p.id << "\n";
+
+            realizarEnvio(c, idxDron, p);
+
+            // eliminar de la cola (shift)
+            for (int j = i; j < c.numCola - 1; j++) {
+                c.cola[j] = c.cola[j + 1];
+            }
+            c.numCola--;
+        }
+        else {
+            i++; // pasar al siguiente
+        }
+    }
+}
+
+
+
 void registrarPaquete(CentroLogistico& c, Paquete p) {
     if (existePaquete(c, p.id)) {
         cout << "[ERROR] Ya existe un paquete con ID: " << p.id << "\n";
@@ -273,33 +305,6 @@ void registrarPaquete(CentroLogistico& c, Paquete p) {
         }
     }
     procesarCola(c);
-}
-
-void procesarCola(CentroLogistico& c) {
-    if (c.numCola == 0) return;
-
-    cout << "\n[COLA] Procesando paquetes en espera...\n";
-
-    int i = 0;
-    while (i < c.numCola) {
-        Paquete p = c.cola[i];
-
-        int idxDron = buscarDronCualquiera(c, p.peso);
-
-        if (idxDron != -1) {
-            cout << "[COLA] Intentando enviar paquete " << p.id << "\n";
-
-            realizarEnvio(c, idxDron, p);
-
-            // eliminar de la cola (shift)
-            for (int j = i; j < c.numCola - 1; j++) {
-                c.cola[j] = c.cola[j + 1];
-            }
-            c.numCola--;
-        } else {
-            i++; // pasar al siguiente
-        }
-    }
 }
 
 // Muestra todos los paquetes pendientes de asignacion
