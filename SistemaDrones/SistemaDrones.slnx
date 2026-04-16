@@ -3,5 +3,5 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="SistemaDrones.vcxproj" />
+  <Project Path="SistemaDrones.vcxproj" Id="c6b37c4e-7b5b-4ee7-b489-3d8ed21ae328" />
 </Solution>

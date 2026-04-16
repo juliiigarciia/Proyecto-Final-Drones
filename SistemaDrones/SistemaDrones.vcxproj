@@ -132,6 +132,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Drone.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="Paquete.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
