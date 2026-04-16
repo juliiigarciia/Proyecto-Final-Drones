@@ -1,5 +1,6 @@
 // =============================================================
 // GestorRutas.hpp
+// Mariano
 // Representacion del grafo de zonas y algoritmo de Dijkstra.
 // En vez de map/set, usamos arrays con contador.
 //
