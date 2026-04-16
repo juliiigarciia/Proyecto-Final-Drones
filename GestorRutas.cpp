@@ -1,5 +1,6 @@
 // =============================================================
 // GestorRutas.cpp
+// Mariano
 // Implementacion del grafo de zonas y el algoritmo de Dijkstra.
 // Sin map/set: usamos arrays con contador y indices enteros.
 //
