@@ -45,7 +45,7 @@ static int buscarOCrearNodo(Grafo& g, string nombre) {
         return -1;
     }
 
-    g.nodos[g.numNodos].nombre     = nombre;
+    g.nodos[g.numNodos].nombre = nombre;
     g.nodos[g.numNodos].numVecinos = 0;
     g.numNodos++;
 
@@ -60,23 +60,43 @@ static int buscarOCrearNodo(Grafo& g, string nombre) {
 void inicializarGrafo(Grafo& g) {
     g.numNodos = 0;
 
-    // Conexiones predefinidas del sistema:
-    //   Almacen Central --> Zona Norte (5 km)  -- ruta directa
-    //   Almacen Central --> Zona Este  (3 km)
-    //   Almacen Central --> Zona Sur   (8 km)
-    //   Zona Este       --> Zona Norte (4 km)  -- alternativa: 3+4=7 km
-    //
-    // Dijkstra elegira la ruta directa de 5 km para Zona Norte.
-    agregarConexion(g, "Almacen Central", "Zona Norte", 5.0);
-    agregarConexion(g, "Almacen Central", "Zona Sur",   8.0);
-    agregarConexion(g, "Almacen Central", "Zona Este",  3.0);
-    agregarConexion(g, "Zona Este",       "Zona Norte", 4.0);
+    // --- CONEXIONES PRINCIPALES (Desde Madrid Centro) ---
+    agregarConexion(g, "Madrid Centro", "Vallecas", 8.0);
+    agregarConexion(g, "Madrid Centro", "Alcorcon", 14.0);
+    agregarConexion(g, "Madrid Centro", "Getafe", 13.0);
+    agregarConexion(g, "Madrid Centro", "Las Rozas", 19.0);
+    agregarConexion(g, "Madrid Centro", "Alcobendas", 16.0);
+    agregarConexion(g, "Madrid Centro", "Pozuelo", 10.0);
+
+    // --- ZONA SUR / SUROESTE ---
+    agregarConexion(g, "Alcorcon", "Mostoles", 5.0);
+    agregarConexion(g, "Alcorcon", "Leganes", 6.0);
+    agregarConexion(g, "Alcorcon", "Fuenlabrada", 8.0);
+    agregarConexion(g, "Getafe", "Leganes", 5.0);
+    agregarConexion(g, "Getafe", "Fuenlabrada", 7.0);
+    agregarConexion(g, "Getafe", "Parla", 10.0);
+    agregarConexion(g, "Getafe", "Pinto", 9.0);
+
+    // --- ZONA OESTE / NOROESTE ---
+    agregarConexion(g, "Pozuelo", "Majadahonda", 6.0);
+    agregarConexion(g, "Pozuelo", "Boadilla", 8.0);
+    agregarConexion(g, "Las Rozas", "Majadahonda", 4.0);
+
+    // --- ZONA ESTE (Corredor del Henares) ---
+    agregarConexion(g, "Vallecas", "Coslada", 11.0);
+    agregarConexion(g, "Vallecas", "Rivas", 15.0);
+    agregarConexion(g, "Coslada", "San Fernando", 3.0);
+    agregarConexion(g, "San Fernando", "Torrejon", 9.0);
+    agregarConexion(g, "Torrejon", "Alcala de Henares", 11.0);
+
+    // --- ZONA NORTE ---
+    agregarConexion(g, "Alcobendas", "San Sebastian de los Reyes", 2.0);
 }
 
 // Agrega una conexion dirigida entre dos nodos.
 // Si los nodos no existen, los crea automaticamente.
 void agregarConexion(Grafo& g, string origen, string destino, double distancia) {
-    int idOrigen  = buscarOCrearNodo(g, origen);
+    int idOrigen = buscarOCrearNodo(g, origen);
     int idDestino = buscarOCrearNodo(g, destino);
 
     if (idOrigen == -1 || idDestino == -1) return;
@@ -110,7 +130,7 @@ void mostrarGrafo(const Grafo& g) {
         for (int j = 0; j < n.numVecinos; j++) {
             int dest = n.vecinos[j].idDestino;
             cout << "    --> " << g.nodos[dest].nombre
-                 << " (" << n.vecinos[j].distancia << " km)\n";
+                << " (" << n.vecinos[j].distancia << " km)\n";
         }
     }
 }
@@ -119,17 +139,17 @@ void mostrarGrafo(const Grafo& g) {
 // Dijkstra
 // =============================================================
 
-// Calcula la ruta mas corta desde "Almacen Central" hasta el destino.
+// Calcula la ruta mas corta desde "Madrid Centro" hasta el destino.
 // Devuelve un ResultadoRuta con la lista de nodos y la distancia total.
 ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
     ResultadoRuta resultado;
     resultado.encontrada = false;
-    resultado.numNodos   = 0;
-    resultado.kmTotales  = 0.0;
+    resultado.numNodos = 0;
+    resultado.kmTotales = 0.0;
 
     // Buscamos los indices de origen y destino en el grafo
-    int idOrigen = buscarNodo(g, "Almacen Central");
-    int idDest   = buscarNodo(g, destino);
+    int idOrigen = buscarNodo(g, "Madrid Centro");
+    int idDest = buscarNodo(g, destino);
 
     if (idDest == -1) {
         cout << "[ERROR] El destino '" << destino << "' no existe en el grafo.\n";
@@ -138,8 +158,8 @@ ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
 
     // Caso especial: el destino es el mismo origen
     if (idOrigen == idDest) {
-        resultado.nodos[0]  = "Almacen Central";
-        resultado.numNodos  = 1;
+        resultado.nodos[0] = "Madrid Centro";
+        resultado.numNodos = 1;
         resultado.kmTotales = 0.0;
         resultado.encontrada = true;
         return resultado;
@@ -151,7 +171,7 @@ ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
     bool   visitado[MAX_NODOS];  // true si ya fue procesado
 
     for (int i = 0; i < g.numNodos; i++) {
-        dist[i]     = INF;   // distancia desconocida = infinita
+        dist[i] = INF;   // distancia desconocida = infinita
         anterior[i] = -1;    // sin nodo anterior
         visitado[i] = false;
     }
@@ -161,7 +181,7 @@ ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
     for (int iter = 0; iter < g.numNodos; iter++) {
 
         // 2a) Encontrar el nodo no visitado con menor distancia
-        int    u         = -1;
+        int    u = -1;
         double menorDist = INF;
 
         for (int i = 0; i < g.numNodos; i++) {
@@ -178,12 +198,12 @@ ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
 
         // 2b) Relajar las aristas del nodo actual
         for (int j = 0; j < g.nodos[u].numVecinos; j++) {
-            int    v         = g.nodos[u].vecinos[j].idDestino;
+            int    v = g.nodos[u].vecinos[j].idDestino;
             double nuevaDist = dist[u] + g.nodos[u].vecinos[j].distancia;
 
             // Si encontramos un camino mas corto, lo actualizamos
             if (nuevaDist < dist[v]) {
-                dist[v]     = nuevaDist;
+                dist[v] = nuevaDist;
                 anterior[v] = u;
             }
         }
@@ -197,7 +217,7 @@ ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
     // Reconstruimos al reves (destino --> origen)
     string rutaInversa[MAX_RUTA];
     int    numInversa = 0;
-    int    actual     = idDest;
+    int    actual = idDest;
 
     while (actual != -1 && numInversa < MAX_RUTA) {
         rutaInversa[numInversa] = g.nodos[actual].nombre;
@@ -210,7 +230,7 @@ ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
         resultado.nodos[i] = rutaInversa[numInversa - 1 - i];
     }
 
-    resultado.numNodos  = numInversa;
+    resultado.numNodos = numInversa;
     resultado.kmTotales = dist[idDest];
     resultado.encontrada = true;
 

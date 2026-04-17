@@ -225,38 +225,6 @@ void mostrarFlota(const CentroLogistico& c) {
 //   > 15 kg  --> HeavyDuty
 // Si el tipo ideal no esta disponible, busca cualquier alternativa.
 // Si no hay ningun dron libre, manda el paquete a la cola de espera.
-
-
-void procesarCola(CentroLogistico& c) {
-    if (c.numCola == 0) return;
-
-    cout << "\n[COLA] Procesando paquetes en espera...\n";
-
-    int i = 0;
-    while (i < c.numCola) {
-        Paquete p = c.cola[i];
-
-        int idxDron = buscarDronCualquiera(c, p.peso);
-
-        if (idxDron != -1) {
-            cout << "[COLA] Intentando enviar paquete " << p.id << "\n";
-
-            realizarEnvio(c, idxDron, p);
-
-            // eliminar de la cola (shift)
-            for (int j = i; j < c.numCola - 1; j++) {
-                c.cola[j] = c.cola[j + 1];
-            }
-            c.numCola--;
-        }
-        else {
-            i++; // pasar al siguiente
-        }
-    }
-}
-
-
-
 void registrarPaquete(CentroLogistico& c, Paquete p) {
     if (existePaquete(c, p.id)) {
         cout << "[ERROR] Ya existe un paquete con ID: " << p.id << "\n";
@@ -304,7 +272,22 @@ void registrarPaquete(CentroLogistico& c, Paquete p) {
             c.numCola++;
         }
     }
-    procesarCola(c);
+}
+
+// Añade el paquete directamente a la cola de espera
+void ponerEnCola(CentroLogistico& c, Paquete p) {
+    if (existePaquete(c, p.id)) {
+        cout << "[ERROR] Ya existe un paquete con ID: " << p.id << "\n";
+        return;
+    }
+
+    if (c.numCola < MAX_COLA) {
+        c.cola[c.numCola] = p;
+        c.numCola++;
+        cout << "[COLA] Paquete " << p.id << " añadido a la espera.\n";
+    } else {
+        cout << "[ERROR] Cola de espera llena.\n";
+    }
 }
 
 // Muestra todos los paquetes pendientes de asignacion
@@ -345,29 +328,6 @@ void asignarRuta(const CentroLogistico& c, string idDron, string destino) {
         cout << ruta.nodos[i];
     }
     cout << "\n  Distancia total: " << ruta.kmTotales << " km\n";
-}
-
-// Version 2: recibe coordenadas X e Y y las mapea a una zona:
-//   coordY > 0  --> Zona Norte
-//   coordX > 0  --> Zona Este
-//   resto       --> Zona Sur
-void asignarRutaCoordenadas(const CentroLogistico& c, string idDron,
-                             float coordX, float coordY)
-{
-    cout << "\n[RUTA] Ruta por coordenadas para dron " << idDron
-         << " --> (" << coordX << ", " << coordY << ")\n";
-
-    string zona;
-    if (coordY > 0) {
-        zona = "Zona Norte";
-    } else if (coordX > 0) {
-        zona = "Zona Este";
-    } else {
-        zona = "Zona Sur";
-    }
-
-    cout << "  Coordenadas mapeadas a zona: " << zona << "\n";
-    asignarRuta(c, idDron, zona);  // reutilizamos la version con string
 }
 
 // =============================================================

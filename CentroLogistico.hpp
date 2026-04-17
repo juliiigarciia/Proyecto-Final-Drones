@@ -60,15 +60,14 @@ void mostrarFlota(const CentroLogistico& c);
 // ---- Gestion de paquetes ----
 // Intenta asignar un dron al paquete automaticamente
 void registrarPaquete(CentroLogistico& c, Paquete p);
+// Añade el paquete directamente a la cola de espera
+void ponerEnCola(CentroLogistico& c, Paquete p);
 // Muestra los paquetes en espera
 void mostrarColaEspera(const CentroLogistico& c);
 
 // ---- Rutas ----
 // Calcula y muestra la ruta optima desde el centro al destino
 void asignarRuta(const CentroLogistico& c, std::string idDron, std::string destino);
-// Calcula ruta a partir de coordenadas (X, Y) mapeadas a zona
-void asignarRutaCoordenadas(const CentroLogistico& c, std::string idDron,
-                             float coordX, float coordY);
 
 // ---- Ficheros ----
 void cargarFlotaDesdeFichero(CentroLogistico& c, std::string fichero);

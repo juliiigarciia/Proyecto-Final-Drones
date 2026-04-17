@@ -4,11 +4,9 @@
 // Representacion del grafo de zonas y algoritmo de Dijkstra.
 // En vez de map/set, usamos arrays con contador.
 //
-// Grafo predefinido:
-//   Almacen Central --> Zona Norte (5 km)
-//   Almacen Central --> Zona Sur   (8 km)
-//   Almacen Central --> Zona Este  (3 km)
-//   Zona Este       --> Zona Norte (4 km)
+// Grafo predefinido: area metropolitana de Madrid.
+//   Origen: Madrid Centro
+//   Zonas: Sur/Suroeste, Oeste/Noroeste, Este (Corredor Henares), Norte
 // =============================================================
 
 #ifndef GESTOR_RUTAS_HPP
@@ -17,9 +15,9 @@
 #include <string>
 
 // ---- Constantes del grafo ----
-const int MAX_NODOS   = 10;  // maximo de nodos en el grafo
-const int MAX_VECINOS = 5;   // maximo de conexiones por nodo
-const int MAX_RUTA    = 10;  // maximo de nodos en una ruta resultado
+const int MAX_NODOS = 25;  // maximo de nodos en el grafo
+const int MAX_VECINOS = 8;   // maximo de conexiones por nodo
+const int MAX_RUTA = 30;  // maximo de nodos en una ruta resultado
 
 // ---- Arista: conexion entre dos nodos ----
 struct Arista {
@@ -62,7 +60,7 @@ int buscarNodo(const Grafo& g, std::string nombre);
 // Muestra todas las conexiones del grafo por pantalla
 void mostrarGrafo(const Grafo& g);
 
-// Ejecuta Dijkstra desde "Almacen Central" hasta el destino indicado
+// Ejecuta Dijkstra desde "Madrid Centro" hasta el destino indicado
 ResultadoRuta calcularRutaOptima(const Grafo& g, std::string destino);
 
 #endif // GESTOR_RUTAS_HPP
