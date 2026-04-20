@@ -64,10 +64,18 @@ void registrarPaquete(CentroLogistico& c, Paquete p);
 void ponerEnCola(CentroLogistico& c, Paquete p);
 // Muestra los paquetes en espera
 void mostrarColaEspera(const CentroLogistico& c);
+// Extrae el primer paquete de la cola (FIFO) e intenta asignarle un dron
+void procesarCola(CentroLogistico& c);
 
 // ---- Rutas ----
 // Calcula y muestra la ruta optima desde el centro al destino
 void asignarRuta(const CentroLogistico& c, std::string idDron, std::string destino);
+// Ejecuta el vuelo de un dron con paquete asignado: descuenta bateria real
+void ejecutarVuelo(CentroLogistico& c, std::string idDron);
+
+// ---- Mantenimiento ----
+// Recarga la bateria de todos los drones al 100% (autonomia maxima)
+void recargarBaterias(CentroLogistico& c);
 
 // ---- Ficheros ----
 void cargarFlotaDesdeFichero(CentroLogistico& c, std::string fichero);

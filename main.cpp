@@ -207,23 +207,26 @@ int mostrarMenu() {
 
     cout << "\n";
     cout << "+==========================================+\n";
-    cout << "|   SIGFD - Sistema de Control de Drones   |\n";
+    cout << "|   SIGFD - Centro de Control Logistico    |\n";
     cout << "+==========================================+\n";
-    cout << "|  1. Ver flota de drones                  |\n";
-    cout << "|  2. Agregar dron manualmente             |\n";
-    cout << "|  3. Registrar nuevo paquete              |\n";
-    cout << "|  4. Ver cola de espera                   |\n";
-    cout << "|  5. Calcular ruta optima (Dijkstra)      |\n";
-    cout << "|  6. Guia de uso y funcionamiento         |\n";
+    cout << "| --- GESTION DE FLOTA -------------------|\n";
+    cout << "|  1. Ver estado de flota y baterias       |\n";
+    cout << "|  2. Mantenimiento: Recargar baterias     |\n";
+    cout << "|  3. Agregar dron manualmente             |\n";
+    cout << "| --- OPERATIVA DE ENVIOS -----------------|\n";
+    cout << "|  4. Registrar nuevo paquete              |\n";
+    cout << "|  5. Procesar cola de espera (FIFO)       |\n";
+    cout << "|  6. Ejecutar Vuelo (Dijkstra + Bateria)  |\n";
+    cout << "| --- ADMINISTRACION ---------------------|\n";
     cout << "|  7. Ver resumen del dia                  |\n";
-    cout << "|  8. Exportar informe del dia             |\n";
-    cout << "|  9. Ejecutar tests basicos               |\n";
+    cout << "|  8. Guia de uso y funcionamiento         |\n";
+    cout << "|  9. Ejecutar tests basicos (QA)          |\n";
     cout << "|  0. Salir y exportar informe             |\n";
     cout << "+==========================================+\n";
     cout << "  Elige una opcion: ";
 
     int opcion = -1;
-    leerEntero(opcion);   // blindado contra letras
+    leerEntero(opcion);
     return opcion;
 }
 
@@ -272,25 +275,28 @@ void opcionGuiaUso() {
     cout << "\n===========================================================\n";
     cout << "           GUIA DE USO Y FUNCIONAMIENTO - SIGFD            \n";
     cout << "===========================================================\n";
-    cout << "  El Sistema de Gestion de Flota de Drones (SIGFD) permite \n";
-    cout << "  coordinar envios de paquetes usando una flota variada.   \n\n";
-    cout << "  1. Flota de Drones:\n";
-    cout << "     - Standard: Uso general (carga media, velocidad media).\n";
-    cout << "     - Express: Entregas rapidas (poca carga, muy rapidos).\n";
-    cout << "     - HeavyDuty: Cargas pesadas (mucha carga, mas lentos).\n\n";
-    cout << "  2. Registro de Paquetes:\n";
-    cout << "     Al registrar un paquete, puedes 'Enviar ahora' o mandarlo\n";
-    cout << "     a la 'Cola de espera'. Si envias ahora, el sistema busca\n";
-    cout << "     el dron mas adecuado segun el peso del paquete. Si no hay\n";
-    cout << "     drones disponibles o sin bateria, ira a la cola de espera.\n\n";
-    cout << "  3. Rutas (Algoritmo de Dijkstra):\n";
-    cout << "     El sistema conoce un mapa de la Comunidad de Madrid. Usa el\n";
-    cout << "     algoritmo de Dijkstra para encontrar el camino mas corto\n";
-    cout << "     (menos kilometros) entre el centro y el destino.\n\n";
-    cout << "  4. Consumo de Bateria:\n";
-    cout << "     Cada dron gasta mas bateria cuanto mas peso lleva. Si un\n";
-    cout << "     dron no tiene bateria suficiente para el viaje, no podra\n";
-    cout << "     realizar el envio.\n";
+    cout << "  FLUJO DE TRABAJO RECOMENDADO:\n";
+    cout << "  1) Revisar flota     -> Opcion 1 (ver baterias y estados)\n";
+    cout << "  2) Registrar paquete -> Opcion 4 (envia ahora o a la cola)\n";
+    cout << "  3) Ejecutar vuelo    -> Opcion 6 (Dijkstra + bateria real)\n";
+    cout << "  4) Si sin bateria    -> Opcion 2 (recargar y volver al 3)\n";
+    cout << "  5) Cola pendiente    -> Opcion 5 (procesar paquetes FIFO)\n\n";
+    cout << "  TIPOS DE DRON:\n";
+    cout << "    Standard  : 60 km/h | max 15 kg | autonomia  80 km\n";
+    cout << "    Express   : 120km/h | max  8 kg | autonomia  60 km\n";
+    cout << "    HeavyDuty : 40 km/h | max 50 kg | autonomia 120 km\n\n";
+    cout << "  REGLA DE BATERIA:\n";
+    cout << "    consumoPorKm = base_tipo + (peso_kg * factor_tipo)\n";
+    cout << "    kmGastados   = kmRuta * consumoPorKm\n";
+    cout << "    Si bateriaActual < kmGastados --> vuelo CANCELADO\n\n";
+    cout << "  COLA DE ESPERA (FIFO):\n";
+    cout << "    Los paquetes se guardan en un array. Al procesar,\n";
+    cout << "    se saca el primero (indice 0) y el resto se\n";
+    cout << "    desplaza una posicion (equivale a std::queue).\n\n";
+    cout << "  ALGORITMO DE DIJKSTRA:\n";
+    cout << "    Recorre el grafo de Madrid (nodos = zonas, aristas = km).\n";
+    cout << "    Siempre elige el nodo mas cercano no visitado.\n";
+    cout << "    Resultado: ruta optima en km desde Madrid Centro.\n";
     cout << "===========================================================\n";
     pausar();
 }
@@ -338,12 +344,16 @@ void opcionRegistrarPaquete(CentroLogistico& centro) {
     pkg.prioridad = (priNum == 2) ? URGENTE : NORMAL;
 
     cout << "\n  --- ACCION ---\n";
-    cout << "    1) Enviar ahora (Asignacion automatica)\n";
-    cout << "    2) Guardar en cola de espera\n";
+    // Opcion 1: el sistema busca dron, lo pre-asigna en cola, y usas Opcion 6 para volar.
+    // Opcion 2: va directo a la cola sin asignar dron (para procesar con Opcion 5).
+    // Opcion 3: asignacion y vuelo completo automatico (comportamiento clasico).
+    cout << "    1) Pre-asignar dron (luego vuela con Opcion 6)\n";
+    cout << "    2) Guardar en cola de espera (procesar con Opcion 5)\n";
+    cout << "    3) Envio completo automatico (asignar + volar ahora)\n";
     cout << "  Selecciona: ";
-    
+
     int accion = 0;
-    if (!leerEntero(accion) || (accion != 1 && accion != 2)) {
+    if (!leerEntero(accion) || accion < 1 || accion > 3) {
         cout << "  [ERROR] Accion no valida. Cancelando registro.\n";
         pausar();
         return;
@@ -351,12 +361,35 @@ void opcionRegistrarPaquete(CentroLogistico& centro) {
 
     cout << "\n";
     if (accion == 1) {
-        registrarPaquete(centro, pkg);
-        cout << "  [OK] Proceso de envio ejecutado para '" << id << "'.\n";
-    } else {
+        // Pre-asignamos un dron buscando en el array de drones del centro.
+        // Buscamos el primero DISPONIBLE que soporte el peso del paquete.
+        // El campo idDronAsignado guarda el ID para que opcion 6 lo encuentre.
+        int idxDron = -1;
+        for (int i = 0; i < centro.numDrones && idxDron == -1; i++) {
+            if (centro.drones[i].estado == DISPONIBLE &&
+                centro.drones[i].cargaMaxima >= peso) {
+                idxDron = i;
+            }
+        }
+
+        if (idxDron == -1) {
+            cout << "  [AVISO] No hay dron disponible ahora. Paquete a la cola sin asignar.\n";
+            ponerEnCola(centro, pkg);
+        } else {
+            pkg.idDronAsignado = centro.drones[idxDron].id;
+            ponerEnCola(centro, pkg);
+            cout << "  [OK] Paquete '" << id << "' pre-asignado al dron '"
+                 << pkg.idDronAsignado << "'.\n"
+                 << "       Usa la Opcion 6 para ejecutar el vuelo.\n";
+        }
+    } else if (accion == 2) {
         ponerEnCola(centro, pkg);
+    } else {
+        // Opcion 3: flujo completo automatico (como antes)
+        registrarPaquete(centro, pkg);
+        cout << "  [OK] Envio automatico ejecutado para '" << id << "'.\n";
     }
-    
+
     pausar();
 }
 
@@ -365,29 +398,41 @@ void opcionVerCola(CentroLogistico& centro) {
     pausar();
 }
 
-void opcionCalcularRuta(CentroLogistico& centro) {
-    string idDron;
-    cout << "\n  ID del dron: ";
-    getline(cin, idDron);
-
-    // Elegir destino por numero (a prueba de errores tipograficos)
-    string destino = elegirZona();
-    if (destino.empty()) { pausar(); return; }
-
-    // Efecto "pensando..." para Dijkstra
-    cout << "\n  Calculando ruta optima";
-    for (int i = 0; i < 3; i++) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(400));
-        cout << "." << flush;
-    }
-    cout << " iRuta encontrada!\n\n";
-
-    asignarRuta(centro, idDron, destino);
+// Opcion 5: Extrae y procesa el primer paquete de la cola (FIFO).
+// Si hay dron libre con bateria, lo envia. Si no, lo reencola.
+void opcionProcesarCola(CentroLogistico& centro) {
+    mostrarColaEspera(centro);
+    procesarCola(centro);
     pausar();
 }
 
-void opcionCalcularCoordenadas(CentroLogistico& centro) {
+// Opcion 6: El operador elige un dron con paquete asignado.
+// Se calcula la ruta con Dijkstra, se comprueba la bateria y
+// se ejecuta el vuelo (o se cancela con mensaje claro).
+void opcionEjecutarVuelo(CentroLogistico& centro) {
+    // Mostramos la flota para que el operador sepa que drones existen
+    mostrarFlota(centro);
 
+    string idDron;
+    cout << "\n  ID del dron a hacer volar: ";
+    getline(cin, idDron);
+
+    // Efecto visual de calculo
+    cout << "  Procesando vuelo";
+    for (int i = 0; i < 3; i++) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(350));
+        cout << "." << flush;
+    }
+    cout << "\n";
+
+    ejecutarVuelo(centro, idDron);
+    pausar();
+}
+
+// Opcion 2: Recarga la bateria de todos los drones disponibles al 100%
+void opcionRecargarBaterias(CentroLogistico& centro) {
+    recargarBaterias(centro);
+    pausar();
 }
 
 void opcionResumen(CentroLogistico& centro) {
@@ -450,15 +495,18 @@ int main() {
     do {
         opcion = mostrarMenu();
 
-        if (opcion == 1) opcionVerFlota(centro);
-        else if (opcion == 2) opcionAgregarDron(centro);
-        else if (opcion == 3) opcionRegistrarPaquete(centro);
-        else if (opcion == 4) opcionVerCola(centro);
-        else if (opcion == 5) opcionCalcularRuta(centro);
-        else if (opcion == 6) opcionGuiaUso();
-        else if (opcion == 7) opcionResumen(centro);
-        else if (opcion == 8) opcionExportarInforme(centro);
-        else if (opcion == 9) opcionTests();
+        // ---- GESTION DE FLOTA ----
+        if      (opcion == 1) opcionVerFlota(centro);          // ver drones + baterias
+        else if (opcion == 2) opcionRecargarBaterias(centro);  // recarga al 100%
+        else if (opcion == 3) opcionAgregarDron(centro);       // agregar dron manual
+        // ---- OPERATIVA DE ENVIOS ----
+        else if (opcion == 4) opcionRegistrarPaquete(centro);  // registrar + asignar
+        else if (opcion == 5) opcionProcesarCola(centro);      // FIFO: saca y envia
+        else if (opcion == 6) opcionEjecutarVuelo(centro);     // Dijkstra + bateria
+        // ---- ADMINISTRACION ----
+        else if (opcion == 7) opcionResumen(centro);           // resumen del dia
+        else if (opcion == 8) opcionGuiaUso();                 // guia actualizada
+        else if (opcion == 9) opcionTests();                   // tests QA
         else if (opcion == 0) {
             cout << "\n[INFO] Exportando informe antes de cerrar...\n";
             exportarInformeDia(centro, "informe_envios.txt");

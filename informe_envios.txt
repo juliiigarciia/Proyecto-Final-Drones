@@ -1,0 +1,38 @@
+======================================================
+   INFORME DE ENVIOS - SIGFD
+   Generado: 20/04/2026 19:09:49
+======================================================
+
+  Total de vuelos realizados: 4
+
+------------------------------------------------------
+  Vuelo #1
+    Fecha/Hora : 20/04/2026 19:05:48
+    Dron       : D003 (HeavyDuty)
+    Paquete    : P10
+    Ruta       : Madrid Centro -> Getafe -> Pinto
+    Km volados : 22 km
+------------------------------------------------------
+  Vuelo #2
+    Fecha/Hora : 20/04/2026 19:06:45
+    Dron       : D001 (Standard)
+    Paquete    : p11
+    Ruta       : Madrid Centro -> Vallecas -> Coslada
+    Km volados : 19 km
+------------------------------------------------------
+  Vuelo #3
+    Fecha/Hora : 20/04/2026 19:08:03
+    Dron       : D003 (HeavyDuty)
+    Paquete    : p909
+    Ruta       : Madrid Centro -> Alcobendas -> San Sebastian de los Reyes
+    Km volados : 18 km
+------------------------------------------------------
+  Vuelo #4
+    Fecha/Hora : 20/04/2026 19:09:34
+    Dron       : D001 (Standard)
+    Paquete    : 230
+    Ruta       : Madrid Centro -> Getafe -> Pinto
+    Km volados : 22 km
+------------------------------------------------------
+
+  Fin del informe.

@@ -1,6 +1,10 @@
 ﻿  main.cpp
+  Drone.cpp
   Paquete.cpp
+  GestorRutas.cpp
+  GestorFicheros.cpp
   CentroLogistico.cpp
   Generando código...
-  SIGFD.vcxproj -> C:\Users\julia\OneDrive\Documenten\git\Nueva carpeta\x64\Debug\SIGFD.exe
+  LINK : no se encontró C:\Users\julia\Desktop\Proyecto-Final-Drones-main\Proyecto-Final-Drones-main\x64\Debug\SIGFD.exe o no lo generó el último vínculo incremental; ejecutando vínculo completo
+  SIGFD.vcxproj -> C:\Users\julia\Desktop\Proyecto-Final-Drones-main\Proyecto-Final-Drones-main\x64\Debug\SIGFD.exe
           1 archivo(s) copiado(s).
