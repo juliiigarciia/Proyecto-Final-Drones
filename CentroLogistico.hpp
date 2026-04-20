@@ -1,87 +1,85 @@
 // =============================================================
 // CentroLogistico.hpp
-// Estructura principal del sistema: agrupa la flota, la cola
-// de espera, el historial de vuelos y el grafo de rutas.
-// Siguiendo el patron: contenedor + contadores.
+// Clase principal del sistema: agrupa la flota (vector<Drone*>),
+// la cola de espera (vector<Paquete>) y el historial de vuelos.
+//
+// MEMORIA DINAMICA: la flota usa vector<Drone*>.
+//   Cada Drone* apunta a un objeto creado con 'new'.
+//   El destructor de CentroLogistico llama 'delete' sobre cada
+//   puntero para liberar la memoria correctamente.
 // =============================================================
-
-#ifndef CENTRO_LOGISTICO_HPP
-#define CENTRO_LOGISTICO_HPP
-
+#pragma once
+#include <string>
+#include <vector>
 #include "Drone.hpp"
 #include "Paquete.hpp"
 #include "GestorRutas.hpp"
 #include "GestorFicheros.hpp"
 
-#include <string>
+// Limite logico (no de memoria, sino de negocio)
+const int MAX_DRONES_FLOTA = 50;
 
-// ---- Constantes de capacidad ----
-const int MAX_DRONES    = 50;
-const int MAX_COLA      = 100;
-const int MAX_HISTORIAL = 200;
-
-// =============================================================
-// Estructura CentroLogistico
-// Contiene todos los datos del sistema en arrays con contador.
-// =============================================================
-struct CentroLogistico {
+class CentroLogistico {
+private:
     std::string nombre;
 
-    // Flota de drones
-    Drone drones[MAX_DRONES];
-    int   numDrones;
+    // Flota: punteros a Drone creados con 'new' (memoria dinamica)
+    std::vector<Drone*>        drones;
+    // Cola FIFO de paquetes pendientes
+    std::vector<Paquete>       cola;
+    // Historial de vuelos completados
+    std::vector<RegistroVuelo> historial;
 
-    // Paquetes en espera (sin dron asignado)
-    Paquete cola[MAX_COLA];
-    int     numCola;
-
-    // Historial de todos los vuelos del dia
-    RegistroVuelo historial[MAX_HISTORIAL];
-    int           numVuelos;
-
-    // Total de envios realizados
     int totalEnvios;
 
-    // Grafo de rutas para Dijkstra
+    // Grafo de rutas (Dijkstra)
     Grafo grafo;
+
+    // Variable estatica: total de envios en toda la sesion (todas las instancias)
+    static int totalEnviosSesion;
+
+    // --- Metodos privados de apoyo ---
+    Drone*  buscarDronPorId(const std::string& id) const;
+    Drone*  buscarDronPorTipo(double peso, const std::string& tipo) const;
+    Drone*  buscarDronCualquiera(double peso) const;
+    bool    existePaquete(const std::string& id)   const;
+    void    realizarEnvio(Drone& dron, Paquete& paquete);
+
+public:
+    CentroLogistico(const std::string& nombre);
+    // Destructor: libera memoria de todos los Drone* del vector
+    ~CentroLogistico();
+
+    // --- Gestion de drones ---
+    void agregarDron(Drone* d);               // toma ownership del puntero
+    bool eliminarDron(const std::string& id); // llama delete internamente
+    void mostrarFlota()  const;
+    void mostrarFlota(bool detallado) const;  // sobrecarga estatica
+
+    // --- Gestion de paquetes ---
+    // Sobrecarga estatica: registrar desde objeto Paquete
+    void registrarPaquete(const Paquete& p);
+    // Sobrecarga estatica: registrar desde parametros sueltos
+    void registrarPaquete(const std::string& id, double peso,
+                          const std::string& destino, Prioridad prioridad);
+
+    void ponerEnCola(const Paquete& p);
+    void mostrarColaEspera() const;
+    void procesarCola();
+
+    // --- Vuelo con Dijkstra + bateria (lanza excepciones) ---
+    void ejecutarVuelo(const std::string& idDron);
+
+    // --- Mantenimiento ---
+    void recargarBaterias();
+
+    // --- Ficheros ---
+    void cargarFlotaDesdeFichero(const std::string& fichero);
+    void exportarInformeDia(const std::string& fichero) const;
+
+    // --- Informes ---
+    void mostrarResumen() const;
+
+    // Getter para variable estatica
+    static int getTotalEnviosSesion();
 };
-
-// ---- Funciones de inicializacion ----
-void inicializarCentro(CentroLogistico& c, std::string nombre);
-
-// ---- Gestion de drones ----
-// Agrega un dron a la flota (falla si el ID ya existe o esta llena)
-bool agregarDron(CentroLogistico& c, Drone d);
-// Elimina un dron por su ID
-bool eliminarDron(CentroLogistico& c, std::string idDron);
-// Muestra todos los drones de la flota
-void mostrarFlota(const CentroLogistico& c);
-
-// ---- Gestion de paquetes ----
-// Intenta asignar un dron al paquete automaticamente
-void registrarPaquete(CentroLogistico& c, Paquete p);
-// Añade el paquete directamente a la cola de espera
-void ponerEnCola(CentroLogistico& c, Paquete p);
-// Muestra los paquetes en espera
-void mostrarColaEspera(const CentroLogistico& c);
-// Extrae el primer paquete de la cola (FIFO) e intenta asignarle un dron
-void procesarCola(CentroLogistico& c);
-
-// ---- Rutas ----
-// Calcula y muestra la ruta optima desde el centro al destino
-void asignarRuta(const CentroLogistico& c, std::string idDron, std::string destino);
-// Ejecuta el vuelo de un dron con paquete asignado: descuenta bateria real
-void ejecutarVuelo(CentroLogistico& c, std::string idDron);
-
-// ---- Mantenimiento ----
-// Recarga la bateria de todos los drones al 100% (autonomia maxima)
-void recargarBaterias(CentroLogistico& c);
-
-// ---- Ficheros ----
-void cargarFlotaDesdeFichero(CentroLogistico& c, std::string fichero);
-void exportarInformeDia(const CentroLogistico& c, std::string fichero);
-
-// ---- Informes ----
-void mostrarResumen(const CentroLogistico& c);
-
-#endif // CENTRO_LOGISTICO_HPP

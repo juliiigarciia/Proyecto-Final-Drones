@@ -1,66 +1,46 @@
 // =============================================================
 // GestorRutas.hpp
-// Mariano
-// Representacion del grafo de zonas y algoritmo de Dijkstra.
-// En vez de map/set, usamos arrays con contador.
-//
-// Grafo predefinido: area metropolitana de Madrid.
-//   Origen: Madrid Centro
-//   Zonas: Sur/Suroeste, Oeste/Noroeste, Este (Corredor Henares), Norte
+// Grafo de zonas de Madrid y algoritmo de Dijkstra.
+// Incluye Excepciones.hpp para poder lanzar
+// ExcepcionRutaNoEncontrada desde calcularRutaOptima.
 // =============================================================
-
-#ifndef GESTOR_RUTAS_HPP
-#define GESTOR_RUTAS_HPP
-
+#pragma once
 #include <string>
+#include "Excepciones.hpp"
 
-// ---- Constantes del grafo ----
-const int MAX_NODOS = 25;  // maximo de nodos en el grafo
-const int MAX_VECINOS = 8;   // maximo de conexiones por nodo
-const int MAX_RUTA = 30;  // maximo de nodos en una ruta resultado
+const int MAX_NODOS   = 25;
+const int MAX_VECINOS = 8;
+const int MAX_RUTA    = 30;
 
-// ---- Arista: conexion entre dos nodos ----
 struct Arista {
-    int    idDestino;   // indice del nodo destino en el array de nodos
-    double distancia;   // km
+    int    idDestino;
+    double distancia;
 };
 
-// ---- Nodo: zona o punto del grafo ----
 struct Nodo {
     std::string nombre;
     Arista      vecinos[MAX_VECINOS];
     int         numVecinos;
 };
 
-// ---- Grafo: conjunto de nodos con sus conexiones ----
 struct Grafo {
     Nodo nodos[MAX_NODOS];
     int  numNodos;
 };
 
-// ---- Resultado de ejecutar Dijkstra ----
 struct ResultadoRuta {
-    std::string nodos[MAX_RUTA];  // nodos en orden (origen --> destino)
+    std::string nodos[MAX_RUTA];
     int    numNodos;
     double kmTotales;
     bool   encontrada;
 };
 
-// ---- Funciones ----
+void           inicializarGrafo(Grafo& g);
+void           agregarConexion(Grafo& g, std::string origen,
+                               std::string destino, double distancia);
+int            buscarNodo(const Grafo& g, std::string nombre);
+void           mostrarGrafo(const Grafo& g);
 
-// Crea el grafo con las zonas y conexiones predefinidas del sistema
-void inicializarGrafo(Grafo& g);
-
-// Agrega una conexion dirigida entre dos nodos (crea los nodos si no existen)
-void agregarConexion(Grafo& g, std::string origen, std::string destino, double distancia);
-
-// Busca un nodo por nombre. Devuelve su indice o -1 si no existe.
-int buscarNodo(const Grafo& g, std::string nombre);
-
-// Muestra todas las conexiones del grafo por pantalla
-void mostrarGrafo(const Grafo& g);
-
-// Ejecuta Dijkstra desde "Madrid Centro" hasta el destino indicado
-ResultadoRuta calcularRutaOptima(const Grafo& g, std::string destino);
-
-#endif // GESTOR_RUTAS_HPP
+// Lanza ExcepcionRutaNoEncontrada si el destino no existe en el grafo
+// o si no hay camino desde Madrid Centro.
+ResultadoRuta  calcularRutaOptima(const Grafo& g, std::string destino);

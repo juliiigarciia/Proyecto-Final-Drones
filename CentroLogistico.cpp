@@ -1,580 +1,389 @@
 // =============================================================
 // CentroLogistico.cpp
-// Implementacion de las funciones principales del sistema.
-// Gestiona la flota (array de drones), la cola de espera
-// (array de paquetes) y el historial de vuelos (array de registros).
+// Implementacion de la clase CentroLogistico.
+// Usa vector<Drone*> (memoria dinamica), lanza excepciones
+// y demuestra polimorfismo dinamico al llamar a d->calcularBateria().
 // =============================================================
-
 #include "CentroLogistico.hpp"
 #include <iostream>
-#include <string>
-
+#include <stdexcept>
 using namespace std;
 
+// Definicion de la variable estatica
+int CentroLogistico::totalEnviosSesion = 0;
+
 // =============================================================
-// Inicializacion
+// Constructor / Destructor
 // =============================================================
 
-// Inicializa el centro: pone contadores a 0 y prepara el grafo
-void inicializarCentro(CentroLogistico& c, string nombre) {
-    c.nombre      = nombre;
-    c.numDrones   = 0;
-    c.numCola     = 0;
-    c.numVuelos   = 0;
-    c.totalEnvios = 0;
-
-    inicializarGrafo(c.grafo);
-
+CentroLogistico::CentroLogistico(const string& nombre)
+    : nombre(nombre), totalEnvios(0)
+{
+    inicializarGrafo(grafo);
     cout << "\n*** Centro Logistico '" << nombre << "' iniciado ***\n";
 }
 
-// =============================================================
-// Funciones internas de apoyo
-// =============================================================
-
-// Busca un dron por ID en la flota.
-// Devuelve su indice o -1 si no existe.
-static int buscarDronPorId(const CentroLogistico& c, string id) {
-    for (int i = 0; i < c.numDrones; i++) {
-        if (c.drones[i].id == id) return i;
+// El destructor libera TODA la memoria dinamica de la flota
+CentroLogistico::~CentroLogistico() {
+    for (Drone* d : drones) {
+        delete d;   // libera cada objeto creado con 'new'
     }
-    return -1;
+    drones.clear();
 }
 
-// Comprueba si ya existe un paquete con ese ID (en cola o en historial)
-static bool existePaquete(const CentroLogistico& c, string id) {
-    for (int i = 0; i < c.numCola; i++) {
-        if (c.cola[i].id == id) return true;
+int CentroLogistico::getTotalEnviosSesion() { return totalEnviosSesion; }
+
+// =============================================================
+// Metodos privados de apoyo
+// =============================================================
+
+Drone* CentroLogistico::buscarDronPorId(const string& id) const {
+    for (Drone* d : drones)
+        if (d->getId() == id) return d;
+    return nullptr;   // nullptr es el "null" moderno de C++
+}
+
+Drone* CentroLogistico::buscarDronPorTipo(double peso, const string& tipo) const {
+    for (Drone* d : drones) {
+        if (d->getTipo()       == tipo       &&
+            d->getEstado()     == DISPONIBLE  &&
+            d->getCargaMaxima() >= peso)
+            return d;
     }
-    for (int i = 0; i < c.numVuelos; i++) {
-        if (c.historial[i].idPaquete == id) return true;
+    return nullptr;
+}
+
+Drone* CentroLogistico::buscarDronCualquiera(double peso) const {
+    for (Drone* d : drones) {
+        if (d->getEstado()     == DISPONIBLE &&
+            d->getCargaMaxima() >= peso)
+            return d;
     }
+    return nullptr;
+}
+
+bool CentroLogistico::existePaquete(const string& id) const {
+    for (const Paquete& p : cola)
+        if (p.getId() == id) return true;
+    for (const RegistroVuelo& v : historial)
+        if (v.idPaquete == id) return true;
     return false;
 }
 
-// Busca el primero dron DISPONIBLE del tipo indicado que pueda
-// cargar el peso. Devuelve su indice o -1 si no hay ninguno.
-static int buscarDronPorTipo(const CentroLogistico& c, double peso, TipoDron tipo) {
-    for (int i = 0; i < c.numDrones; i++) {
-        if (c.drones[i].tipo      == tipo       &&
-            c.drones[i].estado    == DISPONIBLE  &&
-            c.drones[i].cargaMaxima >= peso)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
+// realizarEnvio: ejecuta el vuelo completo.
+// Lanza ExcepcionRutaNoEncontrada o ExcepcionBateria si algo falla.
+void CentroLogistico::realizarEnvio(Drone& dron, Paquete& paquete) {
+    // Dijkstra: puede lanzar ExcepcionRutaNoEncontrada
+    ResultadoRuta ruta = calcularRutaOptima(grafo, paquete.getDestino());
 
-// Busca cualquier dron DISPONIBLE que pueda con el peso,
-// sin importar el tipo. Se usa como alternativa si el ideal no esta.
-static int buscarDronCualquiera(const CentroLogistico& c, double peso) {
-    for (int i = 0; i < c.numDrones; i++) {
-        if (c.drones[i].estado      == DISPONIBLE &&
-            c.drones[i].cargaMaxima >= peso)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
-// Realiza el envio completo:
-//   1. Calcula la ruta con Dijkstra
-//   2. Calcula el consumo de bateria
-//   3. Verifica que el dron tiene bateria suficiente
-//   4. Descuenta la bateria y marca el dron en vuelo
-//   5. Guarda el registro en el historial
-//   6. Simula el regreso (dron vuelve a DISPONIBLE)
-static void realizarEnvio(CentroLogistico& c, int idxDron, Paquete& p) {
-    Drone& dron = c.drones[idxDron];
-
-    ResultadoRuta ruta = calcularRutaOptima(c.grafo, p.destino);
-
-    if (!ruta.encontrada) {
-        cout << "[ERROR] No hay ruta hacia: " << p.destino << "\n";
-        // Metemos el paquete en la cola de espera
-        if (c.numCola < MAX_COLA) {
-            c.cola[c.numCola] = p;
-            c.numCola++;
-        }
-        return;
-    }
-
-    // Calculo del consumo de bateria para el viaje
-    double consumoPorKm = calcularBateria(dron, p.peso);
+    // Calculo de consumo (polimorfismo dinamico: llama a la version
+    // correcta de calcularBateria segun el tipo real del dron)
+    double consumoPorKm = dron.calcularBateria(paquete.getPeso());
     double kmNecesarios = ruta.kmTotales * consumoPorKm;
 
-    // Verificamos que el dron tiene bateria suficiente
-    if (dron.bateriaActual < kmNecesarios) {
-        cout << "[ERROR] Dron " << dron.id << " sin bateria suficiente.\n"
-             << "         Necesita " << kmNecesarios
-             << " km, tiene " << dron.bateriaActual << " km.\n";
-        // Metemos el paquete en cola
-        if (c.numCola < MAX_COLA) {
-            c.cola[c.numCola] = p;
-            c.numCola++;
-        }
-        return;
+    if (!dron.tieneBateriaSuficiente(kmNecesarios)) {
+        throw ExcepcionBateria(
+            "Dron " + dron.getId() +
+            " necesita " + to_string(kmNecesarios) +
+            " km de bateria pero solo tiene " +
+            to_string(dron.getBateriaActual()) + " km.");
     }
 
-    // Descontamos bateria y marcamos el dron en vuelo
-    dron.bateriaActual -= kmNecesarios;
-    dron.estado         = EN_VUELO;
-    p.idDronAsignado    = dron.id;
+    // Comprobar peso (polimorfismo dinamico: getCargaMaxima() virtual)
+    if (paquete.getPeso() > dron.getCargaMaxima()) {
+        throw ExcepcionPesoExcesivo(
+            "Paquete " + paquete.getId() + " pesa " +
+            to_string(paquete.getPeso()) + " kg, dron aguanta " +
+            to_string(dron.getCargaMaxima()) + " kg.");
+    }
 
-    // Construimos el texto de la ruta para el informe
-    string rutaTexto = "";
+    // Ejecutar vuelo
+    dron.setBateriaActual(dron.getBateriaActual() - kmNecesarios);
+    dron.setEstado(EN_VUELO);
+    paquete.setIdDronAsignado(dron.getId());
+
+    // Construir texto de la ruta
+    string rutaTexto;
     for (int i = 0; i < ruta.numNodos; i++) {
         if (i > 0) rutaTexto += " -> ";
         rutaTexto += ruta.nodos[i];
     }
 
-    // Guardamos el registro del vuelo en el historial
-    if (c.numVuelos < MAX_HISTORIAL) {
-        RegistroVuelo vuelo;
-        vuelo.fecha        = obtenerFechaHoraActual();
-        vuelo.idDron       = dron.id;
-        vuelo.tipoDron     = tipoDronATexto(dron.tipo);
-        vuelo.idPaquete    = p.id;
-        vuelo.ruta         = rutaTexto;
-        vuelo.kmRecorridos = ruta.kmTotales;
+    // Guardar registro en el historial
+    RegistroVuelo vuelo;
+    vuelo.fecha        = obtenerFechaHoraActual();
+    vuelo.idDron       = dron.getId();
+    vuelo.tipoDron     = dron.getTipo();
+    vuelo.idPaquete    = paquete.getId();
+    vuelo.ruta         = rutaTexto;
+    vuelo.kmRecorridos = ruta.kmTotales;
+    historial.push_back(vuelo);
 
-        c.historial[c.numVuelos] = vuelo;
-        c.numVuelos++;
-    }
+    totalEnvios++;
+    totalEnviosSesion++;
 
-    c.totalEnvios++;
+    cout << "[ENVIO] " << dron.getId()
+         << " --> " << paquete.getId()
+         << " --> " << paquete.getDestino()
+         << " | " << rutaTexto
+         << " | " << ruta.kmTotales << " km\n";
 
-    cout << "[ENVIO] Dron "  << dron.id
-         << " --> Paquete "  << p.id
-         << " --> "          << p.destino
-         << " | Ruta: "      << rutaTexto
-         << " | "            << ruta.kmTotales << " km\n";
-
-    // Simulamos que el dron regresa y queda disponible de nuevo
-    dron.estado = DISPONIBLE;
+    dron.setEstado(DISPONIBLE);   // regresa al deposito (simulado)
 }
 
 // =============================================================
-// Gestion de Drones
+// Gestion de drones
 // =============================================================
 
-// Agrega un dron a la flota.
-// Falla si ya existe un dron con ese ID o si la flota esta llena.
-bool agregarDron(CentroLogistico& c, Drone d) {
-    if (buscarDronPorId(c, d.id) != -1) {
-        cout << "[ERROR] Ya existe un dron con ID: " << d.id << "\n";
-        return false;
-    }
-    if (c.numDrones >= MAX_DRONES) {
-        cout << "[ERROR] Flota llena. No se puede agregar: " << d.id << "\n";
-        return false;
-    }
-
-    c.drones[c.numDrones] = d;
-    c.numDrones++;
-
-    cout << "[FLOTA] Dron " << d.id
-         << " (" << tipoDronATexto(d.tipo) << ") agregado a la flota.\n";
-    return true;
+void CentroLogistico::agregarDron(Drone* d) {
+    if ((int)drones.size() >= MAX_DRONES_FLOTA)
+        throw ExcepcionFlotaLlena("Flota llena. No se puede agregar: " + d->getId());
+    if (buscarDronPorId(d->getId()) != nullptr)
+        throw ExcepcionDronNoEncontrado("Ya existe un dron con ID: " + d->getId());
+    drones.push_back(d);
+    cout << "[FLOTA] Dron " << d->getId()
+         << " (" << d->getTipo() << ") agregado.\n";
 }
 
-// Elimina un dron por su ID.
-// Desplaza el resto del array para no dejar huecos.
-bool eliminarDron(CentroLogistico& c, string idDron) {
-    int pos = buscarDronPorId(c, idDron);
-
-    if (pos == -1) {
-        cout << "[ERROR] No existe ningun dron con ID: " << idDron << "\n";
-        return false;
-    }
-
-    cout << "[FLOTA] Eliminando dron " << c.drones[pos].id << "...\n";
-
-    // Desplazamos los elementos para cerrar el hueco
-    for (int i = pos; i < c.numDrones - 1; i++) {
-        c.drones[i] = c.drones[i + 1];
-    }
-    c.numDrones--;
-
-    return true;
-}
-
-// Muestra la informacion de todos los drones de la flota
-void mostrarFlota(const CentroLogistico& c) {
-    cout << "\n=== Flota de Drones (" << c.numDrones << " unidades) ===\n";
-
-    if (c.numDrones == 0) {
-        cout << "  (sin drones registrados)\n";
-        return;
-    }
-
-    for (int i = 0; i < c.numDrones; i++) {
-        mostrarDron(c.drones[i]);
-    }
-}
-
-// =============================================================
-// Gestion de Paquetes
-// =============================================================
-
-// Intenta asignar automaticamente un dron al paquete segun su peso:
-//   < 5 kg   --> Express
-//   5-15 kg  --> Standard
-//   > 15 kg  --> HeavyDuty
-// Si el tipo ideal no esta disponible, busca cualquier alternativa.
-// Si no hay ningun dron libre, manda el paquete a la cola de espera.
-void registrarPaquete(CentroLogistico& c, Paquete p) {
-    if (existePaquete(c, p.id)) {
-        cout << "[ERROR] Ya existe un paquete con ID: " << p.id << "\n";
-        return;
-    }
-
-    cout << "\n[PAQUETE] Registrando paquete " << p.id
-         << " (Destino: " << p.destino
-         << ", Peso: "    << p.peso << " kg)\n";
-
-    double peso  = p.peso;
-    int    idxDron = -1;
-
-    // Asignacion por peso
-    if (peso < 5.0) {
-        cout << "[ASIGNACION] Paquete ligero (" << peso << " kg): buscando Express...\n";
-        idxDron = buscarDronPorTipo(c, peso, EXPRESS);
-        if (idxDron == -1) {
-            cout << "[ASIGNACION] Express no disponible. Buscando alternativa...\n";
-            idxDron = buscarDronCualquiera(c, peso);
+bool CentroLogistico::eliminarDron(const string& id) {
+    for (int i = 0; i < (int)drones.size(); i++) {
+        if (drones[i]->getId() == id) {
+            delete drones[i];               // libera memoria
+            drones.erase(drones.begin() + i); // elimina del vector
+            cout << "[FLOTA] Dron " << id << " eliminado.\n";
+            return true;
         }
-    } else if (peso <= 15.0) {
-        cout << "[ASIGNACION] Paquete medio (" << peso << " kg): buscando Standard...\n";
-        idxDron = buscarDronPorTipo(c, peso, STANDARD);
-        if (idxDron == -1) {
-            cout << "[ASIGNACION] Standard no disponible. Buscando alternativa...\n";
-            idxDron = buscarDronCualquiera(c, peso);
-        }
+    }
+    throw ExcepcionDronNoEncontrado("No existe ningun dron con ID: " + id);
+}
+
+// Sobrecarga estatica 1: sin parametros
+void CentroLogistico::mostrarFlota() const {
+    cout << "\n=== Flota de Drones (" << drones.size() << " unidades) ===\n";
+    if (drones.empty()) { cout << "  (sin drones registrados)\n"; return; }
+    for (Drone* d : drones) d->mostrar();  // polimorfismo: cada tipo imprime igual
+}
+
+// Sobrecarga estatica 2: con parametro detallado
+void CentroLogistico::mostrarFlota(bool detallado) const {
+    cout << "\n=== Flota de Drones (" << drones.size() << " unidades) ===\n";
+    if (drones.empty()) { cout << "  (sin drones registrados)\n"; return; }
+    for (Drone* d : drones) d->mostrar(detallado); // polimorfismo
+}
+
+// =============================================================
+// Gestion de paquetes
+// =============================================================
+
+// Sobrecarga estatica 1: desde objeto Paquete
+void CentroLogistico::registrarPaquete(const Paquete& p) {
+    if (existePaquete(p.getId()))
+        throw runtime_error("Ya existe un paquete con ID: " + p.getId());
+
+    cout << "\n[PAQUETE] Registrando " << p.getId()
+         << " (" << p.getDestino() << ", " << p.getPeso() << " kg)\n";
+
+    Drone* dron = nullptr;
+    double peso = p.getPeso();
+    if      (peso < 5.0)  dron = buscarDronPorTipo(peso, "Express");
+    else if (peso <= 15.0) dron = buscarDronPorTipo(peso, "Standard");
+    else                   dron = buscarDronPorTipo(peso, "HeavyDuty");
+
+    if (!dron) dron = buscarDronCualquiera(peso);
+
+    if (dron) {
+        Paquete copia = p;
+        realizarEnvio(*dron, copia);
     } else {
-        cout << "[ASIGNACION] Paquete pesado (" << peso << " kg): buscando HeavyDuty...\n";
-        idxDron = buscarDronPorTipo(c, peso, HEAVY_DUTY);
-        if (idxDron == -1) {
-            cout << "[ASIGNACION] HeavyDuty no disponible. Buscando alternativa...\n";
-            idxDron = buscarDronCualquiera(c, peso);
-        }
-    }
-
-    if (idxDron != -1) {
-        realizarEnvio(c, idxDron, p);
-    } else {
-        cout << "[COLA] Sin drones disponibles. Paquete " << p.id
-             << " en cola de espera.\n";
-        if (c.numCola < MAX_COLA) {
-            c.cola[c.numCola] = p;
-            c.numCola++;
-        }
+        cola.push_back(p);
+        cout << "[COLA] Sin drones disponibles. Paquete " << p.getId() << " en cola.\n";
     }
 }
 
-// Añade el paquete directamente a la cola de espera
-void ponerEnCola(CentroLogistico& c, Paquete p) {
-    if (existePaquete(c, p.id)) {
-        cout << "[ERROR] Ya existe un paquete con ID: " << p.id << "\n";
-        return;
-    }
-
-    if (c.numCola < MAX_COLA) {
-        c.cola[c.numCola] = p;
-        c.numCola++;
-        cout << "[COLA] Paquete " << p.id << " añadido a la espera.\n";
-    } else {
-        cout << "[ERROR] Cola de espera llena.\n";
-    }
+// Sobrecarga estatica 2: desde parametros individuales
+void CentroLogistico::registrarPaquete(const string& id, double peso,
+                                       const string& destino, Prioridad prioridad)
+{
+    Paquete p(id, peso, destino, prioridad);
+    registrarPaquete(p);  // reutiliza la version anterior
 }
 
-// Muestra todos los paquetes pendientes de asignacion
-void mostrarColaEspera(const CentroLogistico& c) {
-    cout << "\n=== Cola de Espera (" << c.numCola << " paquetes) ===\n";
+void CentroLogistico::ponerEnCola(const Paquete& p) {
+    if (existePaquete(p.getId()))
+        throw runtime_error("Ya existe un paquete con ID: " + p.getId());
+    cola.push_back(p);
+    cout << "[COLA] Paquete " << p.getId() << " anadido a la espera.\n";
+}
 
-    if (c.numCola == 0) {
-        cout << "  (sin paquetes en espera)\n";
-        return;
-    }
-
-    for (int i = 0; i < c.numCola; i++) {
+void CentroLogistico::mostrarColaEspera() const {
+    cout << "\n=== Cola de Espera (" << cola.size() << " paquetes) ===\n";
+    if (cola.empty()) { cout << "  (sin paquetes en espera)\n"; return; }
+    for (int i = 0; i < (int)cola.size(); i++) {
         cout << "  [" << (i + 1) << "] ";
-        mostrarPaquete(c.cola[i]);
+        cola[i].mostrar();
     }
 }
 
-// =============================================================
-// Procesar Cola (logica FIFO)
-// =============================================================
-
-// CONCEPTO FIFO (First In, First Out): el primer paquete que entro
-// es el primero en salir, igual que una cola real en correos.
-// Implementacion: accedemos a cola[0] y luego desplazamos todo el
-// array una posicion hacia atras (lo mismo que hace std::queue).
-//
-// Flujo:
-//   1. Si la cola esta vacia, avisamos y salimos.
-//   2. Sacamos el primer paquete (indice 0).
-//   3. Buscamos un dron disponible que soporte el peso.
-//   4a. Si hay dron: llamamos a realizarEnvio (ya gestiona bateria).
-//   4b. Si no hay dron: volvemos a meter el paquete al final de la cola.
-void procesarCola(CentroLogistico& c) {
-    // Verificamos si hay algo en la cola
-    if (c.numCola == 0) {
-        cout << "\n[COLA] La cola de espera esta vacia. No hay nada que procesar.\n";
+void CentroLogistico::procesarCola() {
+    if (cola.empty()) {
+        cout << "\n[COLA] La cola esta vacia.\n";
         return;
     }
 
-    // Extraemos el primer paquete (FIFO: front)
-    Paquete paquete = c.cola[0];
+    // FIFO: sacamos el primero
+    Paquete paquete = cola.front();
+    cola.erase(cola.begin());   // vector::erase desplaza automaticamente
 
-    // Desplazamos el array una posicion hacia atras para cerrar el hueco
-    // Esto es O(n) pero con arrays estaticos es la unica opcion sin punteros
-    for (int i = 0; i < c.numCola - 1; i++) {
-        c.cola[i] = c.cola[i + 1];
-    }
-    c.numCola--;
+    cout << "\n[COLA] Procesando '" << paquete.getId()
+         << "' (" << paquete.getPeso() << " kg) -> " << paquete.getDestino() << "\n";
 
-    cout << "\n[COLA] Procesando paquete '" << paquete.id
-         << "' (" << paquete.peso << " kg) -> " << paquete.destino << "\n";
+    double peso = paquete.getPeso();
+    Drone* dron = nullptr;
+    if      (peso < 5.0)   dron = buscarDronPorTipo(peso, "Express");
+    else if (peso <= 15.0)  dron = buscarDronPorTipo(peso, "Standard");
+    else                    dron = buscarDronPorTipo(peso, "HeavyDuty");
+    if (!dron) dron = buscarDronCualquiera(peso);
 
-    // Buscamos un dron disponible adecuado al peso
-    int idxDron = -1;
-    if (paquete.peso < 5.0) {
-        idxDron = buscarDronPorTipo(c, paquete.peso, EXPRESS);
-        if (idxDron == -1) idxDron = buscarDronCualquiera(c, paquete.peso);
-    } else if (paquete.peso <= 15.0) {
-        idxDron = buscarDronPorTipo(c, paquete.peso, STANDARD);
-        if (idxDron == -1) idxDron = buscarDronCualquiera(c, paquete.peso);
-    } else {
-        idxDron = buscarDronPorTipo(c, paquete.peso, HEAVY_DUTY);
-        if (idxDron == -1) idxDron = buscarDronCualquiera(c, paquete.peso);
-    }
-
-    if (idxDron != -1) {
-        // Hay dron disponible: intentamos el envio (puede fallar por bateria)
-        cout << "[COLA] Dron encontrado: " << c.drones[idxDron].id
-             << ". Ejecutando envio...\n";
-        realizarEnvio(c, idxDron, paquete);
-    } else {
-        // No hay dron: devolvemos el paquete al final de la cola
-        cout << "[COLA] Sin drones disponibles. Paquete '" << paquete.id
-             << "' devuelto al final de la cola.\n";
-        if (c.numCola < MAX_COLA) {
-            c.cola[c.numCola] = paquete;
-            c.numCola++;
+    if (dron) {
+        try {
+            realizarEnvio(*dron, paquete);
+        } catch (const ExcepcionBateria& e) {
+            cout << e.what() << "\n[COLA] Paquete devuelto al final de la cola.\n";
+            cola.push_back(paquete);
         }
+    } else {
+        cout << "[COLA] Sin drones. Paquete '" << paquete.getId() << "' devuelto.\n";
+        cola.push_back(paquete);
     }
 }
 
 // =============================================================
-// Ejecutar Vuelo (logica de bateria completa)
+// ejecutarVuelo (opcion 6): el operador elige el dron
 // =============================================================
+void CentroLogistico::ejecutarVuelo(const string& idDron) {
+    // buscarDronPorId devuelve nullptr si no existe
+    Drone* dron = buscarDronPorId(idDron);
+    if (!dron)
+        throw ExcepcionDronNoEncontrado("No existe ningun dron con ID '" + idDron + "'.");
 
-// FLUJO COMPLETO de un vuelo:
-//   1. El operador elige que dron quiere hacer volar.
-//   2. Verificamos que el dron tiene un paquete pre-asignado
-//      (idDronAsignado coincide con el ID del dron).
-//   3. Llamamos a Dijkstra para obtener los km reales de la ruta.
-//   4. Calculamos el gasto de bateria con la formula:
-//        consumoPorKm = calcularBateria(dron, peso_paquete)
-//        kmGastados   = kmRuta * consumoPorKm
-//      Esto penaliza drones cargados con paquetes pesados.
-//   5. Si bateria >= gasto: vuelo OK, se descuenta la bateria.
-//      Si bateria < gasto:  vuelo cancelado, se recomienda recargar.
-void ejecutarVuelo(CentroLogistico& c, string idDron) {
-    // Buscamos el dron en la flota (buscarDronPorId devuelve indice o -1)
-    int idxDron = buscarDronPorId(c, idDron);
-    if (idxDron == -1) {
-        cout << "[ERROR] No existe ningun dron con ID '" << idDron << "'.\n";
-        return;
-    }
-
-    Drone& dron = c.drones[idxDron];
-
-    // Buscamos en la cola un paquete asignado a este dron
-    // Un paquete asignado tiene su campo idDronAsignado con el ID del dron
+    // Buscar paquete asignado a este dron en la cola
     int idxPkg = -1;
-    for (int i = 0; i < c.numCola; i++) {
-        if (c.cola[i].idDronAsignado == idDron) {
-            idxPkg = i;
-            break;
+    for (int i = 0; i < (int)cola.size(); i++) {
+        if (cola[i].getIdDronAsignado() == idDron) { idxPkg = i; break; }
+    }
+    if (idxPkg == -1)
+        throw runtime_error("El dron '" + idDron + "' no tiene paquete asignado. Usa opcion 4 primero.");
+
+    Paquete paquete = cola[idxPkg];
+    cola.erase(cola.begin() + idxPkg);
+
+    cout << "\n[VUELO] Calculando ruta: " << idDron
+         << " -> " << paquete.getDestino() << "...\n";
+
+    // Llama a Dijkstra + comprobacion bateria (puede lanzar excepciones)
+    try {
+        ResultadoRuta ruta = calcularRutaOptima(grafo, paquete.getDestino());
+
+        double consumoPorKm = dron->calcularBateria(paquete.getPeso()); // POLIMORFISMO
+        double kmGastados   = ruta.kmTotales * consumoPorKm;
+
+        cout << "  Ruta: ";
+        for (int i = 0; i < ruta.numNodos; i++) {
+            if (i > 0) cout << " -> ";
+            cout << ruta.nodos[i];
         }
-    }
+        cout << "\n  Distancia: " << ruta.kmTotales << " km"
+             << " | Consumo: " << kmGastados << " km de bateria"
+             << " | Bateria actual: " << dron->getBateriaActual() << " km\n";
 
-    if (idxPkg == -1) {
-        cout << "[ERROR] El dron '" << idDron
-             << "' no tiene ningun paquete asignado.\n"
-             << "        Usa la opcion 4 para registrar un paquete y asignarlo.\n";
-        return;
-    }
-
-    // Extraemos el paquete asignado
-    Paquete paquete = c.cola[idxPkg];
-
-    // Quitamos el paquete de la cola desplazando el array
-    for (int i = idxPkg; i < c.numCola - 1; i++) {
-        c.cola[i] = c.cola[i + 1];
-    }
-    c.numCola--;
-
-    // Calculamos la ruta con Dijkstra
-    cout << "\n[VUELO] Calculando ruta para dron '" << dron.id
-         << "' -> '" << paquete.destino << "'...\n";
-    ResultadoRuta ruta = calcularRutaOptima(c.grafo, paquete.destino);
-
-    if (!ruta.encontrada) {
-        cout << "[ERROR] No se encontro ruta hacia: " << paquete.destino
-             << ". Paquete devuelto a la cola.\n";
-        // Devolvemos el paquete a la cola
-        if (c.numCola < MAX_COLA) {
-            c.cola[c.numCola] = paquete;
-            c.numCola++;
+        if (!dron->tieneBateriaSuficiente(kmGastados)) {
+            // Devolvemos paquete a la cola con asignacion intacta
+            cola.push_back(paquete);
+            throw ExcepcionBateria(
+                "Necesita " + to_string(kmGastados) +
+                " km pero tiene " + to_string(dron->getBateriaActual()) +
+                " km. Recarga con opcion 2.");
         }
-        return;
-    }
 
-    // Calculamos el consumo real de bateria
-    // consumoPorKm > 1.0 siempre: el dron gasta mas km de bateria
-    // de los que vuela fisicamente (por el peso, viento, etc.)
-    double consumoPorKm = calcularBateria(dron, paquete.peso);
-    double kmGastados   = ruta.kmTotales * consumoPorKm;
+        dron->setBateriaActual(dron->getBateriaActual() - kmGastados);
+        dron->setEstado(EN_VUELO);
 
-    cout << "  Ruta: ";
-    for (int i = 0; i < ruta.numNodos; i++) {
-        if (i > 0) cout << " -> ";
-        cout << ruta.nodos[i];
-    }
-    cout << "\n  Distancia: " << ruta.kmTotales << " km";
-    cout << "\n  Consumo estimado: " << kmGastados << " km de bateria";
-    cout << "\n  Bateria actual del dron: " << dron.bateriaActual << " km\n";
-
-    // Verificamos si el dron tiene bateria suficiente
-    if (dron.bateriaActual < kmGastados) {
-        cout << "\n[CANCELADO] Bateria insuficiente.\n"
-             << "  Necesita: " << kmGastados << " km | Tiene: "
-             << dron.bateriaActual << " km\n"
-             << "  --> Usa la opcion 2 (Recargar baterias) y vuelve a intentarlo.\n";
-        // Devolvemos el paquete a la cola
-        paquete.idDronAsignado = idDron;  // mantenemos la asignacion
-        if (c.numCola < MAX_COLA) {
-            c.cola[c.numCola] = paquete;
-            c.numCola++;
+        string rutaTexto;
+        for (int i = 0; i < ruta.numNodos; i++) {
+            if (i > 0) rutaTexto += " -> ";
+            rutaTexto += ruta.nodos[i];
         }
-        return;
-    }
-
-    // Todo OK: descontamos bateria, registramos vuelo, marcamos entregado
-    dron.bateriaActual -= kmGastados;
-    dron.estado = EN_VUELO;  // marcamos en vuelo momentaneamente
-
-    string rutaTexto = "";
-    for (int i = 0; i < ruta.numNodos; i++) {
-        if (i > 0) rutaTexto += " -> ";
-        rutaTexto += ruta.nodos[i];
-    }
-
-    if (c.numVuelos < MAX_HISTORIAL) {
         RegistroVuelo vuelo;
         vuelo.fecha        = obtenerFechaHoraActual();
-        vuelo.idDron       = dron.id;
-        vuelo.tipoDron     = tipoDronATexto(dron.tipo);
-        vuelo.idPaquete    = paquete.id;
+        vuelo.idDron       = dron->getId();
+        vuelo.tipoDron     = dron->getTipo();
+        vuelo.idPaquete    = paquete.getId();
         vuelo.ruta         = rutaTexto;
         vuelo.kmRecorridos = ruta.kmTotales;
-        c.historial[c.numVuelos] = vuelo;
-        c.numVuelos++;
+        historial.push_back(vuelo);
+        totalEnvios++;
+        totalEnviosSesion++;
+
+        dron->setEstado(DISPONIBLE);
+
+        cout << "\n[OK] VUELO EXITOSO!\n"
+             << "  Dron    : " << dron->getId() << " (" << dron->getTipo() << ")\n"
+             << "  Paquete : " << paquete.getId() << " (" << paquete.getPeso() << " kg)\n"
+             << "  Entrega : " << paquete.getDestino() << "\n"
+             << "  Bateria restante: " << dron->getBateriaActual()
+             << " / " << dron->getAutonomia() << " km\n";
+
+    } catch (const ExcepcionRutaNoEncontrada& e) {
+        cola.push_back(paquete);  // devolver paquete
+        throw;  // re-lanzar para que main lo capture
     }
-    c.totalEnvios++;
-
-    // El dron regresa al deposito y queda disponible
-    dron.estado = DISPONIBLE;
-
-    cout << "\n[OK] VUELO EXITOSO!\n"
-         << "  Dron    : " << dron.id << " (" << tipoDronATexto(dron.tipo) << ")\n"
-         << "  Paquete : " << paquete.id << " (" << paquete.peso << " kg)\n"
-         << "  Entrega : " << paquete.destino << "\n"
-         << "  Bateria restante: " << dron.bateriaActual << " km de "
-         << dron.autonomia << " km\n";
 }
 
 // =============================================================
-// Mantenimiento: Recargar Baterias
+// Mantenimiento
 // =============================================================
 
-// Recarga la bateria de TODOS los drones al maximo (su autonomia).
-// Esto simula una noche de carga o una parada en deposito.
-// La autonomia es la capacidad maxima; bateriaActual es la carga real.
-void recargarBaterias(CentroLogistico& c) {
+void CentroLogistico::recargarBaterias() {
     cout << "\n[MANT] Iniciando recarga de baterias...\n";
-    for (int i = 0; i < c.numDrones; i++) {
-        // Solo recargamos drones que no esten en vuelo activo
-        if (c.drones[i].estado != EN_VUELO) {
-            double anterior = c.drones[i].bateriaActual;
-            c.drones[i].bateriaActual = c.drones[i].autonomia;  // 100%
-            cout << "  [" << c.drones[i].id << "] " << c.drones[i].nombre
-                 << ": " << anterior << " km -> " << c.drones[i].autonomia
-                 << " km (RECARGADO)\n";
+    for (Drone* d : drones) {
+        if (d->getEstado() != EN_VUELO) {
+            double ant = d->getBateriaActual();
+            d->recargar();
+            cout << "  [" << d->getId() << "] " << ant
+                 << " km -> " << d->getAutonomia() << " km (RECARGADO)\n";
         } else {
-            cout << "  [" << c.drones[i].id << "] " << c.drones[i].nombre
-                 << ": EN VUELO - no se puede recargar ahora.\n";
+            cout << "  [" << d->getId() << "] EN VUELO - no se recarga ahora.\n";
         }
     }
-    cout << "[MANT] Recarga completada. Todos los drones listos.\n";
-}
-
-// =============================================================
-// Rutas (sobrecargadas con string / coordenadas)
-// =============================================================
-
-// Version 1: recibe el destino como nombre de zona.
-// Usa Dijkstra e imprime la ruta optima.
-void asignarRuta(const CentroLogistico& c, string idDron, string destino) {
-    cout << "\n[RUTA] Calculando ruta para dron " << idDron
-         << " hacia '" << destino << "'...\n";
-
-    ResultadoRuta ruta = calcularRutaOptima(c.grafo, destino);
-
-    if (!ruta.encontrada) {
-        cout << "[ERROR] No se encontro ruta hacia: " << destino << "\n";
-        return;
-    }
-
-    // Imprimimos la ruta nodo por nodo
-    cout << "  Ruta optima: ";
-    for (int i = 0; i < ruta.numNodos; i++) {
-        if (i > 0) cout << " --> ";
-        cout << ruta.nodos[i];
-    }
-    cout << "\n  Distancia total: " << ruta.kmTotales << " km\n";
+    cout << "[MANT] Recarga completada.\n";
 }
 
 // =============================================================
 // Ficheros
 // =============================================================
 
-// Carga la flota desde un fichero de texto
-void cargarFlotaDesdeFichero(CentroLogistico& c, string fichero) {
+void CentroLogistico::cargarFlotaDesdeFichero(const string& fichero) {
     cout << "\n[FICHERO] Cargando flota desde: " << fichero << "\n";
-    cargarFlota(c.drones, c.numDrones, MAX_DRONES, fichero);
+    // Puede lanzar ExcepcionFichero si no existe el archivo
+    cargarFlota(drones, fichero);
 }
 
-// Exporta el historial de vuelos del dia a un fichero de texto
-void exportarInformeDia(const CentroLogistico& c, string fichero) {
-    exportarInforme(c.historial, c.numVuelos, fichero);
+void CentroLogistico::exportarInformeDia(const string& fichero) const {
+    // Puede lanzar ExcepcionFichero si no puede crear el archivo
+    exportarInforme(historial, fichero);
 }
 
 // =============================================================
-// Resumen
+// Informes
 // =============================================================
 
-void mostrarResumen(const CentroLogistico& c) {
-    cout << "\n========== RESUMEN DEL DIA ==========\n";
-    cout << "  Centro: "            << c.nombre       << "\n";
-    cout << "  Drones en flota: "   << c.numDrones    << "\n";
-    cout << "  Envios realizados: " << c.totalEnvios  << "\n";
-    cout << "  Paquetes en espera: " << c.numCola     << "\n";
-    cout << "=====================================\n";
+void CentroLogistico::mostrarResumen() const {
+    cout << "\n========== RESUMEN DEL DIA ==========\n"
+         << "  Centro          : " << nombre       << "\n"
+         << "  Drones en flota : " << drones.size() << "\n"
+         << "  Envios hoy      : " << totalEnvios  << "\n"
+         << "  Paquetes espera : " << cola.size()  << "\n"
+         << "  Total sesion    : " << totalEnviosSesion << "\n"
+         << "  Drones creados  : " << Drone::getTotalCreados() << " (en memoria)\n"
+         << "=====================================\n";
 }

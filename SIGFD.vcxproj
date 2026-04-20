@@ -74,6 +74,7 @@
   </ItemDefinitionGroup>
   <!-- ===== Ficheros de cabecera (.hpp) ===== -->
   <ItemGroup>
+    <ClInclude Include="Excepciones.hpp" />
     <ClInclude Include="Drone.hpp" />
     <ClInclude Include="Paquete.hpp" />
     <ClInclude Include="GestorRutas.hpp" />

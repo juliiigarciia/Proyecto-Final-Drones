@@ -1,30 +1,53 @@
+// =============================================================
 // Paquete.cpp
-// Implementacion de las funciones para trabajar con paquetes.
-
+// Implementacion de la clase Paquete.
+// =============================================================
 #include "Paquete.hpp"
 #include <iostream>
-#include <string>
-
 using namespace std;
 
-// Conversiones a texto
-string prioridadATexto(Prioridad p) {
-    if (p == URGENTE) return "URGENTE";
-    return "Normal";
+// Constructor: inicializa todos los campos con lista de inicializacion
+Paquete::Paquete(const string& id, double peso,
+                 const string& destino, Prioridad prioridad)
+    : id(id), peso(peso), destino(destino),
+      prioridad(prioridad), idDronAsignado("") {}
+
+// --- Getters ---
+const string& Paquete::getId()             const { return id; }
+double        Paquete::getPeso()           const { return peso; }
+const string& Paquete::getDestino()        const { return destino; }
+Prioridad     Paquete::getPrioridad()      const { return prioridad; }
+const string& Paquete::getIdDronAsignado() const { return idDronAsignado; }
+
+// --- Setter ---
+void Paquete::setIdDronAsignado(const string& idDron) {
+    idDronAsignado = idDron;
 }
 
-// Visualizacion
-void mostrarPaquete(const Paquete& p) {
-    cout << "  Paquete [" << p.id << "]"
-        << "  Peso: " << p.peso << " kg"
-        << "  Destino: " << p.destino
-        << "  Prioridad: " << prioridadATexto(p.prioridad);
+// --- Sobrecarga estatica de mostrar ---
 
-    if (!p.idDronAsignado.empty()) {
-        cout << "  --> Asignado a dron: " << p.idDronAsignado;
-    }
-    else {
-        cout << "  --> EN COLA DE ESPERA";
-    }
+// Version 1: resumen en una linea
+void Paquete::mostrar() const {
+    cout << "  Paquete [" << id << "]"
+         << "  Peso: "      << peso    << " kg"
+         << "  Destino: "   << destino
+         << "  Prioridad: " << prioridadATexto(prioridad);
+    if (!idDronAsignado.empty())
+        cout << "  --> Dron: " << idDronAsignado;
+    else
+        cout << "  --> EN COLA";
     cout << "\n";
+}
+
+// Version 2: con parametro verbose (sobrecarga estatica)
+void Paquete::mostrar(bool verbose) const {
+    mostrar();  // llama a la version basica
+    if (verbose) {
+        cout << "    ID interno: " << id
+             << " | Prioridad enum: " << (int)prioridad << "\n";
+    }
+}
+
+string Paquete::prioridadATexto(Prioridad p) {
+    return (p == URGENTE) ? "URGENTE" : "Normal";
 }

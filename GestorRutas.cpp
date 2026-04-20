@@ -1,238 +1,148 @@
 // =============================================================
 // GestorRutas.cpp
-// Mariano
-// Implementacion del grafo de zonas y el algoritmo de Dijkstra.
-// Sin map/set: usamos arrays con contador y indices enteros.
-//
-// COMO FUNCIONA DIJKSTRA:
-//   1. Empieza en el origen con distancia 0.
-//   2. Asigna distancia "infinita" al resto de nodos.
-//   3. Visita el nodo no visitado mas cercano.
-//   4. Actualiza distancias de sus vecinos si encuentra mejor camino.
-//   5. Repite hasta llegar al destino.
+// Implementacion del grafo y Dijkstra.
+// calcularRutaOptima lanza ExcepcionRutaNoEncontrada
+// en vez de imprimir un error y devolver encontrada=false.
 // =============================================================
-
 #include "GestorRutas.hpp"
 #include <iostream>
 #include <string>
-
 using namespace std;
 
-// Valor que representa "distancia infinita" en Dijkstra
 const double INF = 1e18;
 
-// =============================================================
-// Funciones internas de apoyo (solo visibles en este fichero)
-// =============================================================
-
-// Busca un nodo por nombre en el grafo.
-// Devuelve su indice, o -1 si no existe.
+// Busca nodo por nombre; devuelve indice o -1
 int buscarNodo(const Grafo& g, string nombre) {
-    for (int i = 0; i < g.numNodos; i++) {
+    for (int i = 0; i < g.numNodos; i++)
         if (g.nodos[i].nombre == nombre) return i;
-    }
     return -1;
 }
 
-// Busca un nodo por nombre. Si no existe, lo crea y devuelve su indice.
+// Busca o crea nodo; lanza si el grafo esta lleno
 static int buscarOCrearNodo(Grafo& g, string nombre) {
     int pos = buscarNodo(g, nombre);
     if (pos != -1) return pos;
-
-    // El nodo no existe: lo creamos
-    if (g.numNodos >= MAX_NODOS) {
-        cout << "[ERROR] Grafo lleno. No se puede anadir: " << nombre << "\n";
-        return -1;
-    }
-
-    g.nodos[g.numNodos].nombre = nombre;
+    if (g.numNodos >= MAX_NODOS)
+        throw ExcepcionRutaNoEncontrada("Grafo lleno, no se puede anadir: " + nombre);
+    g.nodos[g.numNodos].nombre     = nombre;
     g.nodos[g.numNodos].numVecinos = 0;
-    g.numNodos++;
-
-    return g.numNodos - 1;
+    return g.numNodos++;
 }
 
-// =============================================================
-// Inicializacion
-// =============================================================
-
-// Crea el grafo con las zonas y conexiones del sistema SIGFD
 void inicializarGrafo(Grafo& g) {
     g.numNodos = 0;
-
-    // --- CONEXIONES PRINCIPALES (Desde Madrid Centro) ---
-    agregarConexion(g, "Madrid Centro", "Vallecas", 8.0);
-    agregarConexion(g, "Madrid Centro", "Alcorcon", 14.0);
-    agregarConexion(g, "Madrid Centro", "Getafe", 13.0);
-    agregarConexion(g, "Madrid Centro", "Las Rozas", 19.0);
+    agregarConexion(g, "Madrid Centro", "Vallecas",    8.0);
+    agregarConexion(g, "Madrid Centro", "Alcorcon",   14.0);
+    agregarConexion(g, "Madrid Centro", "Getafe",     13.0);
+    agregarConexion(g, "Madrid Centro", "Las Rozas",  19.0);
     agregarConexion(g, "Madrid Centro", "Alcobendas", 16.0);
-    agregarConexion(g, "Madrid Centro", "Pozuelo", 10.0);
-
-    // --- ZONA SUR / SUROESTE ---
-    agregarConexion(g, "Alcorcon", "Mostoles", 5.0);
-    agregarConexion(g, "Alcorcon", "Leganes", 6.0);
-    agregarConexion(g, "Alcorcon", "Fuenlabrada", 8.0);
-    agregarConexion(g, "Getafe", "Leganes", 5.0);
-    agregarConexion(g, "Getafe", "Fuenlabrada", 7.0);
-    agregarConexion(g, "Getafe", "Parla", 10.0);
-    agregarConexion(g, "Getafe", "Pinto", 9.0);
-
-    // --- ZONA OESTE / NOROESTE ---
-    agregarConexion(g, "Pozuelo", "Majadahonda", 6.0);
-    agregarConexion(g, "Pozuelo", "Boadilla", 8.0);
+    agregarConexion(g, "Madrid Centro", "Pozuelo",    10.0);
+    agregarConexion(g, "Alcorcon",  "Mostoles",    5.0);
+    agregarConexion(g, "Alcorcon",  "Leganes",     6.0);
+    agregarConexion(g, "Alcorcon",  "Fuenlabrada", 8.0);
+    agregarConexion(g, "Getafe",    "Leganes",     5.0);
+    agregarConexion(g, "Getafe",    "Fuenlabrada", 7.0);
+    agregarConexion(g, "Getafe",    "Parla",      10.0);
+    agregarConexion(g, "Getafe",    "Pinto",       9.0);
+    agregarConexion(g, "Pozuelo",   "Majadahonda", 6.0);
+    agregarConexion(g, "Pozuelo",   "Boadilla",    8.0);
     agregarConexion(g, "Las Rozas", "Majadahonda", 4.0);
-
-    // --- ZONA ESTE (Corredor del Henares) ---
-    agregarConexion(g, "Vallecas", "Coslada", 11.0);
-    agregarConexion(g, "Vallecas", "Rivas", 15.0);
-    agregarConexion(g, "Coslada", "San Fernando", 3.0);
+    agregarConexion(g, "Vallecas",  "Coslada",    11.0);
+    agregarConexion(g, "Vallecas",  "Rivas",      15.0);
+    agregarConexion(g, "Coslada",   "San Fernando", 3.0);
     agregarConexion(g, "San Fernando", "Torrejon", 9.0);
-    agregarConexion(g, "Torrejon", "Alcala de Henares", 11.0);
-
-    // --- ZONA NORTE ---
-    agregarConexion(g, "Alcobendas", "San Sebastian de los Reyes", 2.0);
+    agregarConexion(g, "Torrejon",  "Alcala de Henares", 11.0);
+    agregarConexion(g, "Alcobendas","San Sebastian de los Reyes", 2.0);
 }
 
-// Agrega una conexion dirigida entre dos nodos.
-// Si los nodos no existen, los crea automaticamente.
 void agregarConexion(Grafo& g, string origen, string destino, double distancia) {
-    int idOrigen = buscarOCrearNodo(g, origen);
-    int idDestino = buscarOCrearNodo(g, destino);
-
-    if (idOrigen == -1 || idDestino == -1) return;
-
-    Nodo& nodo = g.nodos[idOrigen];
-
-    if (nodo.numVecinos >= MAX_VECINOS) {
-        cout << "[ERROR] Nodo '" << origen << "' tiene demasiados vecinos.\n";
+    int idO = buscarOCrearNodo(g, origen);
+    int idD = buscarOCrearNodo(g, destino);
+    Nodo& n = g.nodos[idO];
+    if (n.numVecinos >= MAX_VECINOS) {
+        cerr << "[ERROR] Demasiados vecinos en nodo: " << origen << "\n";
         return;
     }
-
-    nodo.vecinos[nodo.numVecinos].idDestino = idDestino;
-    nodo.vecinos[nodo.numVecinos].distancia = distancia;
-    nodo.numVecinos++;
+    n.vecinos[n.numVecinos].idDestino = idD;
+    n.vecinos[n.numVecinos].distancia = distancia;
+    n.numVecinos++;
 }
-
-// =============================================================
-// Visualizacion
-// =============================================================
 
 void mostrarGrafo(const Grafo& g) {
     cout << "\n=== Grafo de Rutas ===\n";
     for (int i = 0; i < g.numNodos; i++) {
         const Nodo& n = g.nodos[i];
         cout << "  " << n.nombre << " -->\n";
-
-        if (n.numVecinos == 0) {
-            cout << "    (sin salidas)\n";
-        }
-
-        for (int j = 0; j < n.numVecinos; j++) {
-            int dest = n.vecinos[j].idDestino;
-            cout << "    --> " << g.nodos[dest].nombre
-                << " (" << n.vecinos[j].distancia << " km)\n";
-        }
+        if (n.numVecinos == 0) { cout << "    (sin salidas)\n"; continue; }
+        for (int j = 0; j < n.numVecinos; j++)
+            cout << "    --> " << g.nodos[n.vecinos[j].idDestino].nombre
+                 << " (" << n.vecinos[j].distancia << " km)\n";
     }
 }
 
 // =============================================================
-// Dijkstra
+// Dijkstra - lanza ExcepcionRutaNoEncontrada en caso de fallo
 // =============================================================
-
-// Calcula la ruta mas corta desde "Madrid Centro" hasta el destino.
-// Devuelve un ResultadoRuta con la lista de nodos y la distancia total.
 ResultadoRuta calcularRutaOptima(const Grafo& g, string destino) {
+    int idOrigen = buscarNodo(g, "Madrid Centro");
+    int idDest   = buscarNodo(g, destino);
+
+    if (idDest == -1)
+        throw ExcepcionRutaNoEncontrada(
+            "El destino '" + destino + "' no existe en el grafo.");
+
     ResultadoRuta resultado;
     resultado.encontrada = false;
-    resultado.numNodos = 0;
-    resultado.kmTotales = 0.0;
+    resultado.numNodos   = 0;
+    resultado.kmTotales  = 0.0;
 
-    // Buscamos los indices de origen y destino en el grafo
-    int idOrigen = buscarNodo(g, "Madrid Centro");
-    int idDest = buscarNodo(g, destino);
-
-    if (idDest == -1) {
-        cout << "[ERROR] El destino '" << destino << "' no existe en el grafo.\n";
-        return resultado;
-    }
-
-    // Caso especial: el destino es el mismo origen
     if (idOrigen == idDest) {
-        resultado.nodos[0] = "Madrid Centro";
-        resultado.numNodos = 1;
-        resultado.kmTotales = 0.0;
+        resultado.nodos[0]  = "Madrid Centro";
+        resultado.numNodos  = 1;
         resultado.encontrada = true;
         return resultado;
     }
 
-    // PASO 1: Inicializacion de arrays de Dijkstra
-    double dist[MAX_NODOS];      // distancia minima conocida desde el origen
-    int    anterior[MAX_NODOS];  // nodo anterior en el camino optimo
-    bool   visitado[MAX_NODOS];  // true si ya fue procesado
-
+    double dist[MAX_NODOS];
+    int    anterior[MAX_NODOS];
+    bool   visitado[MAX_NODOS];
     for (int i = 0; i < g.numNodos; i++) {
-        dist[i] = INF;   // distancia desconocida = infinita
-        anterior[i] = -1;    // sin nodo anterior
+        dist[i]     = INF;
+        anterior[i] = -1;
         visitado[i] = false;
     }
-    dist[idOrigen] = 0.0;  // el origen esta a 0 km de si mismo
+    dist[idOrigen] = 0.0;
 
-    // PASO 2: Bucle principal de Dijkstra
     for (int iter = 0; iter < g.numNodos; iter++) {
-
-        // 2a) Encontrar el nodo no visitado con menor distancia
         int    u = -1;
         double menorDist = INF;
-
-        for (int i = 0; i < g.numNodos; i++) {
-            if (!visitado[i] && dist[i] < menorDist) {
-                menorDist = dist[i];
-                u = i;
-            }
-        }
-
-        // Si no hay nodo alcanzable o ya llegamos al destino, paramos
+        for (int i = 0; i < g.numNodos; i++)
+            if (!visitado[i] && dist[i] < menorDist) { menorDist = dist[i]; u = i; }
         if (u == -1 || u == idDest) break;
-
         visitado[u] = true;
-
-        // 2b) Relajar las aristas del nodo actual
         for (int j = 0; j < g.nodos[u].numVecinos; j++) {
-            int    v = g.nodos[u].vecinos[j].idDestino;
+            int    v        = g.nodos[u].vecinos[j].idDestino;
             double nuevaDist = dist[u] + g.nodos[u].vecinos[j].distancia;
-
-            // Si encontramos un camino mas corto, lo actualizamos
-            if (nuevaDist < dist[v]) {
-                dist[v] = nuevaDist;
-                anterior[v] = u;
-            }
+            if (nuevaDist < dist[v]) { dist[v] = nuevaDist; anterior[v] = u; }
         }
     }
 
-    // PASO 3: Reconstruir la ruta siguiendo los punteros 'anterior'
-    if (dist[idDest] >= INF) {
-        return resultado;  // no se encontro camino
-    }
+    if (dist[idDest] >= INF)
+        throw ExcepcionRutaNoEncontrada(
+            "No hay camino desde Madrid Centro hasta '" + destino + "'.");
 
-    // Reconstruimos al reves (destino --> origen)
-    string rutaInversa[MAX_RUTA];
-    int    numInversa = 0;
-    int    actual = idDest;
-
-    while (actual != -1 && numInversa < MAX_RUTA) {
-        rutaInversa[numInversa] = g.nodos[actual].nombre;
-        numInversa++;
+    // Reconstruir ruta al reves
+    string rutaInv[MAX_RUTA];
+    int    numInv = 0, actual = idDest;
+    while (actual != -1 && numInv < MAX_RUTA) {
+        rutaInv[numInv++] = g.nodos[actual].nombre;
         actual = anterior[actual];
     }
+    for (int i = 0; i < numInv; i++)
+        resultado.nodos[i] = rutaInv[numInv - 1 - i];
 
-    // Invertimos para obtener el orden correcto (origen --> destino)
-    for (int i = 0; i < numInversa; i++) {
-        resultado.nodos[i] = rutaInversa[numInversa - 1 - i];
-    }
-
-    resultado.numNodos = numInversa;
-    resultado.kmTotales = dist[idDest];
+    resultado.numNodos   = numInv;
+    resultado.kmTotales  = dist[idDest];
     resultado.encontrada = true;
-
     return resultado;
 }

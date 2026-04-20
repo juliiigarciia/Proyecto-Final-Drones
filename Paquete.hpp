@@ -1,34 +1,40 @@
-/// =============================================================
-// Paquete.hpp
-// Tipos y funciones relacionados con los paquetes del sistema.
 // =============================================================
-
-#ifndef PAQUETE_HPP
-#define PAQUETE_HPP
-
+// Paquete.hpp
+// Clase Paquete con atributos privados y metodos publicos.
+// Aplica encapsulacion: nadie puede modificar id/peso/destino
+// directamente, solo a traves de los metodos publicos.
+// =============================================================
+#pragma once
 #include <string>
 
-// ---- Prioridad del envio ----
-enum Prioridad {
-    NORMAL,
-    URGENTE
-};
+enum Prioridad { NORMAL, URGENTE };
 
-// ---- Estructura Paquete ----
-struct Paquete {
-    std::string id;               // identificador unico (ej. "PKG-001")
-    double      peso;             // kg
-    std::string destino;          // nodo destino del grafo
+class Paquete {
+private:
+    std::string id;
+    double      peso;
+    std::string destino;
     Prioridad   prioridad;
-    std::string idDronAsignado;   // vacio si aun no tiene dron
+    std::string idDronAsignado;   // "" si aun no tiene dron
+
+public:
+    // Constructor: inicializa todos los campos obligatorios
+    Paquete(const std::string& id, double peso,
+            const std::string& destino, Prioridad prioridad);
+
+    // --- Getters (lectura) ---
+    const std::string& getId()             const;
+    double             getPeso()           const;
+    const std::string& getDestino()        const;
+    Prioridad          getPrioridad()      const;
+    const std::string& getIdDronAsignado() const;
+
+    // --- Setter (unica modificacion permitida) ---
+    void setIdDronAsignado(const std::string& idDron);
+
+    // Sobrecarga estatica: dos versiones de mostrar()
+    void mostrar()             const;   // resumen en una linea
+    void mostrar(bool verbose) const;   // detallado (verbose=true)
+
+    static std::string prioridadATexto(Prioridad p);
 };
-
-// ---- Funciones ----
-
-// Convierte el enum Prioridad a texto
-std::string prioridadATexto(Prioridad p);
-
-// Muestra la informacion del paquete por pantalla
-void mostrarPaquete(const Paquete& p);
-
-#endif // PAQUETE_HPP
