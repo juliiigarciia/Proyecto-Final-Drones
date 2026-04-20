@@ -321,14 +321,9 @@ void opcionRegistrarPaquete(CentroLogistico& c) {
 
     try {
         if (accion == 1) {
-            // Pre-asignar: buscar dron disponible y guardar en cola
+            // Pre-asignar: buscar dron disponible y guardar en cola.
+            // Mostramos la flota para que el usuario sepa que drones hay.
             cout << "\n";
-            // Usamos registrarPaquete con parametros (sobrecarga)
-            // para demostrar la sobrecarga estatica de esa funcion
-            // Buscamos dron manualmente para poder pre-asignar
-            bool asignado = false;
-            // (el CentroLogistico no expone buscarDronCualquiera directamente;
-            //  mostramos la flota para que el usuario sepa que drones hay)
             c.mostrarFlota();
             cout << "  [INFO] Paquete a cola. Usa Op.6 para volar cuando elijas el dron.\n";
             c.ponerEnCola(pkg);

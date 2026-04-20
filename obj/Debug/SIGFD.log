@@ -1,0 +1,10 @@
+﻿  main.cpp
+  Drone.cpp
+  Paquete.cpp
+  GestorRutas.cpp
+  GestorFicheros.cpp
+  CentroLogistico.cpp
+C:\Users\julia\Desktop\d\CentroLogistico.cpp(336,47): warning C4101: 'e': variable local sin referencia
+  Generando código...
+  SIGFD.vcxproj -> C:\Users\julia\Desktop\d\bin\Debug\SIGFD.exe
+          1 archivo(s) copiado(s).
